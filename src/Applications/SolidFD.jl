@@ -401,9 +401,7 @@ function wall_BC(
   cw_Ha::Real, cw_s::Real, tw_Ha::Real, tw_s::Real, τ_Ha::Real, τ_s::Real
 )
   function _wall_BC!(cw::Real, tw::Real, τ::Real, tag::String)
-    if (cw == 0.0) & (tw == 0.0)
-      push!(insulated_tags, tag)
-    elseif (cw > 0.0) & (tw == 0.0)
+    if (cw > 0.0) & (tw == 0.0)
       push!(
         thinWall_options, Dict(
           :cw => cw,
@@ -411,8 +409,8 @@ function wall_BC(
           :domain =>Boundary(model, tags=tag)
         )
       )
-    elseif (cw == 0.0) & (tw > 0.0)
-      error("Insulator wall BC (cw = 0) requires thin wall approximation (tw = 0)")
+    else
+      push!(insulated_tags, tag)
     end
 
     if tw == 0.0
