@@ -129,7 +129,7 @@ function _SolidFD(;
   Ω = Interior(model)
 
   if mesh2vtk
-    meshpath = joinpath(path, title*"_mesh"))
+    meshpath = joinpath(path, title*"_mesh")
     mkpath(meshpath)
     writevtk(model, meshpath)
   end
@@ -150,9 +150,10 @@ function _SolidFD(;
     params[:solid] = Dict(:domain=>"solid", :σ=>σ_Ω)
   end
 
-  insulated_tags, thinWall_params = wall_BC(cw_Ha, cw_s, tw_Ha, tw_s, τ_Ha, τ_s)
+  insulated_tags, thinWall_params, noslip_extra_tags = wall_BC(cw_Ha, cw_s, tw_Ha, tw_s, τ_Ha, τ_s)
+  noslip_tags = append!(["fluid-solid-boundary"], noslip_extra_tags)
   params[:bcs] =  Dict(
-    :u=>Dict(:tags=>["Ha_walls","side_walls"]),
+    :u=>Dict(:tags=>noslip_tags),
     :j=>Dict(:tags=>insulated_tags),
     :thin_wall=>thinWall_params,
   )
@@ -292,6 +293,7 @@ function σ_field(model, Ω, cw_Ha::Real, cw_s::Real, tw_Ha::Real, tw_s::Real)
         σ_l
       end
     end
+
     σ_CellField = CellField(map(entity_to_σ, cell_entity), Ω)
     return σ_CellField
   end
@@ -331,11 +333,12 @@ end
 function solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
   labels = get_face_labeling(model)
   tags_outlet = append!(collect(1:20),[22])
+  # These are the external walls, i.e., not necesarily the fluid-solid boundary
   tags_j_Ha = append!(collect(1:20), [23,24])
   tags_j_side = append!(collect(1:20), [25,26])
   add_tag_from_tags!(labels, "outlet", tags_outlet)
-  add_tag_from_tags!(labels, "Ha_walls", tags_j_Ha)
-  add_tag_from_tags!(labels, "side_walls", tags_j_side)
+  add_tag_from_tags!(labels, "Ha_ext_walls", tags_j_Ha)
+  add_tag_from_tags!(labels, "side_ext_walls", tags_j_side)
 
   if (tw_Ha > 0.0) | (tw_s > 0.0)
     cell_entity = get_cell_entity(labels)
@@ -358,9 +361,9 @@ function solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
     function set_entities(xs)
       tol = 1.0e-9
       if all(x->(x[1]>b-tol)||x[1]<-b+tol,xs)
-        solid_Ha
-      elseif all(x->(x[2]>b-tol)||x[2]<-b+tol,xs)
         solid_s
+      elseif all(x->(x[2]>b-tol)||x[2]<-b+tol,xs)
+        solid_Ha
       else
         fluid
       end
@@ -380,10 +383,8 @@ function solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
     end
     add_tag!(labels,"solid", solid_entities)
     add_tag!(labels,"fluid", [fluid])
-    tags_j = vcat(collect(1:(8+12)), collect((1:4).+(8+12+2)))
-    add_tag_from_tags!(labels, "insulating", tags_j)
     Meshers.add_non_slip_at_solid_entity!(model, solid_entities, fluid, noslip)
-    add_tag!(labels, "noslip", [noslip])
+    add_tag!(labels, "fluid-solid-boundary", [noslip])
   end
 
   return nothing
@@ -394,6 +395,9 @@ end
 
 Selects the insulating BC or thin wall BC for both Ha and Side walls according
 to cw and tw.
+
+Also selects the tags for the no-slip velocity BC which do not lie in a
+fluid-solid boundary, i.e., when tw=0.0 in that side.
 """
 function wall_BC(
   cw_Ha::Real, cw_s::Real, tw_Ha::Real, tw_s::Real, τ_Ha::Real, τ_s::Real
@@ -413,16 +417,23 @@ function wall_BC(
       error("Insulator wall BC (cw = 0) requires thin wall approximation (tw = 0)")
     end
 
+    if tw == 0.0
+      # add_non_slip_at_solid_entity! does not detect this as fluid-solid
+      # boundary, so it must be manually added to the no-slip BC tag list
+      push!(noslip_extra_tags, tag)
+    end
+
     return nothing
   end
 
   insulated_tags = Vector{String}()
   thinWall_options = Vector{Dict{Symbol,Any}}()
+  noslip_extra_tags = Vector{String}()
 
-  _wall_BC!(cw_Ha, tw_Ha, τ_Ha, "Ha_walls")
-  _wall_BC!(cw_s, tw_s, τ_s, "side_walls")
+  _wall_BC!(cw_Ha, tw_Ha, τ_Ha, "Ha_ext_walls")
+  _wall_BC!(cw_s, tw_s, τ_s, "side_ext_walls")
 
-  return insulated_tags, thinWall_options
+  return insulated_tags, thinWall_options, noslip_extra_tags
 end
 
 # Mesher maps and helper funcs
