@@ -129,7 +129,9 @@ function _SolidFD(;
   Ω = Interior(model)
 
   if mesh2vtk
-    writevtk(model, title*"_mesh")
+    meshpath = joinpath(path, title*"_mesh"))
+    mkpath(meshpath)
+    writevtk(model, meshpath)
   end
 
   params[:model] = model
@@ -219,7 +221,7 @@ function _SolidFD(;
     if (tw_Ha > 0.0) & (tw_s > 0.0)
       push!(cellfields, "σ"=>σ_Ω)
     end
-    writevtk(Ω, joinpath(path,title), order=2, cellfields=cellfields)
+    writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
     toc!(t,"vtk")
   end
   if verbose
