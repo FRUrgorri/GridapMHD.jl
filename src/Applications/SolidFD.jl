@@ -449,18 +449,18 @@ function mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, stretch_fine)
     stretch_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
 
     if (tw_s > 0.0) | (tw_Ha > 0.0)
-      ncoord = solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
+      coord = solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
     end
 
     if stretch_fine
-      ncoord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(stretch_Ha,stretch_Ha),dirs=(1,2))
-      ncoord = stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(stretch_Ha,stretch_Ha),dirs=(1,2))
+      coord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(stretch_Ha,stretch_Ha),dirs=(1,2))
+      coord = stretchMHD(coord,domain=(0,b,0,1.0),factor=(stretch_Ha,stretch_Ha),dirs=(1,2))
     else
-      ncoord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(stretch_side,stretch_Ha),dirs=(1,2))
-      ncoord = stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(stretch_side,stretch_Ha),dirs=(1,2))
+      coord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(stretch_side,stretch_Ha),dirs=(1,2))
+      coord = stretchMHD(coord,domain=(0,b,0,1.0),factor=(stretch_side,stretch_Ha),dirs=(1,2))
     end
 
-    return ncoord
+    return coord
   end
 
   return _mesh_map
@@ -505,7 +505,8 @@ function solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
     elseif nx > (nl[1] + ns[1])
       ncoord[1] = x0 + tw_s + nl[1]*dxl + (nx - nl[1] - ns[1])*dxs
     end
-  elseif tw_Ha > 0.0
+  end
+  if tw_Ha > 0.0
     ny = abs(ncoord[2] - y0)/dy
     if ny < ns[2]
       ncoord[2] = y0 + ny*dys
