@@ -56,7 +56,6 @@ function _SolidFD(;
   title = "SolidFD",
   path = ".",
   vtk = true,
-  debug = false,
   res_assemble = false,
   jac_assemble = false,
   solve = true,
@@ -78,7 +77,6 @@ function _SolidFD(;
 
   info = Dict{Symbol,Any}()
   params = Dict{Symbol,Any}(
-    :debug=>debug,
     :solve=>solve,
     :res_assemble=>res_assemble,
     :jac_assemble=>jac_assemble,
