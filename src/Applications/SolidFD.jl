@@ -41,23 +41,24 @@ function SolidFD(;
 end
 
 function _SolidFD(;
+  title = "SolidFD",
+  path = ".",
   distribute = nothing,
   rank_partition = nothing,
   nl = (4,4),
   ns = (2,2),
   Ha = 10.0,
+  Re = 1.0,
+  N = nothing,
   dir_B = (0.0,1.0,0.0),
-  cw_Ha = 0.0,
-  cw_s = 0.0,
   b = 1.0,
-  L = 0.1,
+  L = nothing,
   tw_Ha = 0.0,
   tw_s = 0.0,
-  title = "SolidFD",
-  path = ".",
+  cw_Ha = 0.0,
+  cw_s = 0.0,
+  inlet = nothing,
   vtk = true,
-  res_assemble = false,
-  jac_assemble = false,
   solve = true,
   solver = :julia,
   verbose = true,
@@ -65,6 +66,8 @@ function _SolidFD(;
   stretch_fine = false,
   τ_Ha = 100.0,
   τ_s = 100.0,
+  res_assemble = false,
+  jac_assemble = false,
   nsums = 10,
   #petsc_options="-snes_monitor -ksp_error_if_not_converged true -ksp_converged_reason -ksp_type preonly -pc_type lu -pc_factor_mat_solver_type mumps"
   )
@@ -91,6 +94,42 @@ function _SolidFD(;
   @assert length(rank_partition) == length(nc)
   parts = distribute(LinearIndices((prod(rank_partition),)))
 
+  # Check for FD approx. (2D) or full 3D simulation
+  FD = (
+    (length(nc) == 2) && (length(rank_partition) == 2) && isa(L, Nothing) &&
+    isa(inlet, Nothing) && (Re == 1.0) && isa(N, Nothing)
+  )
+  Full3D = (
+    (length(nc) == 3) && (length(rank_partition) == 3) && isa(L, Number) &&
+    !isa(inlet, Nothing) && isa(Re, Nothing) && isa(N, Number)
+  )
+  if FD
+    _nc = (nc[1],nc[2],3)
+    _rank_partition = (rank_partition[1], rank_partition[2], 1)
+    L = 0.1
+    N = Ha^2/Re
+    f = VectorValue(0.0, 0.0, 1.0)
+    periodic = (false, false, true)
+  elseif Full3D
+    _nc = nc
+    _rank_partition = rank_partition
+    f = VectorValue(0.0, 0.0, 0.0)
+    periodic = (false, false, false)
+    if ns[3] > 0
+      error("No solid elements allowed at inlet/outlet regions.")
+    end
+    if inlet == :parabolic
+      u_inlet((x,y,z)) = VectorValue(0, 0, 2.0*(1-x^2-y^2))
+    elseif inlet == :uniform
+      u_inlet = VectorValue(0.0, 0.0, 1.0)
+    end
+  else
+    error(
+      "Input args are not compatible with either a 3D computation or a \
+      fully developed approximation."
+    )
+  end
+
   # Timer
   t = PTimer(parts,verbose=verbose)
   params[:ptimer] = t
@@ -107,21 +146,16 @@ function _SolidFD(;
   domain = domain_liq .+ (-tw_s, tw_s, -tw_Ha, tw_Ha, 0.0, 0.0)
 
   # Reduced quantities
-  Re = 1.0
-  N = Ha^2/Re
   dirB = (1/norm(VectorValue(dir_B)))*VectorValue(dir_B)
-  f = VectorValue(0.0,0.0,1.0)
   α = 1.0/N
   β = 1.0/Ha^2
   γ = 1.0
 
   # Prepare problem in terms of reduced quantities
-  _nc = (nc[1],nc[2],3)
-  _rank_partition = (rank_partition[1], rank_partition[2], 1)
   _mesh_map = mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, stretch_fine)
   model = CartesianDiscreteModel(
     parts, _rank_partition, domain, _nc;
-    isperiodic=(false, false, true), map=_mesh_map
+    isperiodic=periodic, map=_mesh_map
   )
   solidFD_add_tags!(model, b, tw_Ha, tw_s)
   Ω = Interior(model)
@@ -148,11 +182,27 @@ function _SolidFD(;
     params[:solid] = Dict(:domain=>"solid", :σ=>σ_Ω)
   end
 
+  # Boundary conditions
   insulated_tags, thinWall_params, noslip_extra_tags = wall_BC(cw_Ha, cw_s, tw_Ha, tw_s, τ_Ha, τ_s)
   noslip_tags = append!(["fluid-solid-boundary"], noslip_extra_tags)
-  params[:bcs] =  Dict(
-    :u=>Dict(:tags=>noslip_tags),
-    :j=>Dict(:tags=>insulated_tags),
+  if FD
+    u_BC = Dict(:tags=>noslip_tags)
+    j_BC = Dict(:tags=>insulated_tags)
+  elseif Full3D
+    u_BC = Dict(
+      :tags=>["inlet", noslip_tags...],
+      :values=>[
+        u_inlet,
+        fill(VectorValue(0.0, 0.0, 0.0), length(noslip_tags))...
+      ],
+    )
+    j_BC = Dict(
+      :tags=>[insulated_tags..., "inlet", "outlet"],
+    )
+  end
+  params[:bcs] = Dict(
+    :u=>u_BC,
+    :j=>j_BC,
     :thin_wall=>thinWall_params,
   )
 
@@ -174,49 +224,22 @@ function _SolidFD(;
 
   # Compute quantities
   tic!(t,barrier=true)
-  uh,ph,jh,φh = xh
 
-  div_jh = ∇·jh
-  div_uh = ∇·uh
-
-
-  #Post process
-  dΩ = Measure(Ω,6)
-  uh_0 = sum(∫(uh)*dΩ)[3]/sum(∫(1.0)*dΩ)
-
-  uh_n = uh/uh_0
-  ph_n = ph/uh_0
-  jh_n = jh/uh_0
-  φh_n = φh/uh_0
-
-  div_jh_n = div_jh/uh_0
-  div_uh_n = div_uh/uh_0
-
-  if cw_s == 0.0
-    u_a(x) = analytical_GeneralHunt_u(1.0,cw_Ha,-1.0,Ha,nsums,x)
-    e_u = u_a - uh_n
-  else
-    e_u = uh_n
+  # Post process
+  if FD
+    cellfields, uh_0, kp = postprocess_FD(xh, Ω)
+  elseif Full3D
+    cellfields, uh_0, kp = postprocess_3D(xh, model, Ω)
   end
 
-  kp = 1/uh_0
   if cw_s == 0.0 && cw_Ha == 0.0
-    kp_a = kp_shercliff_cartesian(b,Ha)
+    kp_a = kp_shercliff_cartesian(b, Ha)
   else
-    kp_a = kp_tillac(b,Ha,cw_s,cw_Ha)
+    kp_a = kp_tillac(b, Ha, cw_s, cw_Ha)
   end
-  dev_kp = 100*abs(kp_a-kp)/max(kp_a,kp)
+  dev_kp = 100*abs(kp_a - kp)/max(kp_a, kp)
 
   if vtk
-    cellfields = Vector{Pair}([
-      "uh"=>uh_n,
-      "e_u"=>e_u,
-      "ph"=>ph_n,
-      "jh"=>jh_n,
-      "phi"=>φh_n,
-      "div_jh"=>div_jh_n,
-      "div_uh"=>div_uh_n,
-    ])
     if (tw_Ha > 0.0) & (tw_s > 0.0)
       push!(cellfields, "σ"=>σ_Ω)
     end
@@ -229,10 +252,10 @@ function _SolidFD(;
 
   info[:nc] = nc
   info[:ncells] = num_cells(model)
-  info[:ndofs_u] = length(get_free_dof_values(uh))
-  info[:ndofs_p] = length(get_free_dof_values(ph))
-  info[:ndofs_j] = length(get_free_dof_values(jh))
-  info[:ndofs_φ] = length(get_free_dof_values(φh))
+  info[:ndofs_u] = length(get_free_dof_values(cellfields["uh"]))
+  info[:ndofs_p] = length(get_free_dof_values(cellfields["ph"]))
+  info[:ndofs_j] = length(get_free_dof_values(cellfields["jh"]))
+  info[:ndofs_φ] = length(get_free_dof_values(cellfields["φh"]))
   info[:ndofs] = length(get_free_dof_values(xh))
   info[:Re] = Re
   info[:Ha] = Ha
@@ -250,6 +273,7 @@ function _SolidFD(;
   return info, t
 end
 
+# Conductivity to CellField
 """
   σ_field(model, Ω, cw_Ha::Real, cw_s::Real, tw_Ha::Real, tw_s::Real)
 
@@ -330,10 +354,12 @@ end
 
 function solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
   labels = get_face_labeling(model)
+  tags_inlet = append!(collect(1:20),[21])
   tags_outlet = append!(collect(1:20),[22])
   # These are the external walls, i.e., not necesarily the fluid-solid boundary
   tags_j_Ha = append!(collect(1:20), [23,24])
   tags_j_side = append!(collect(1:20), [25,26])
+  add_tag_from_tags!(labels, "inlet", tags_inlet)
   add_tag_from_tags!(labels, "outlet", tags_outlet)
   add_tag_from_tags!(labels, "Ha_ext_walls", tags_j_Ha)
   add_tag_from_tags!(labels, "side_ext_walls", tags_j_side)
@@ -414,7 +440,7 @@ function wall_BC(
     end
 
     if tw == 0.0
-      # add_non_slip_at_solid_entity! does not detect this as fluid-solid
+      # add_non_slip_at_solid_entity! does not detect this tag as a fluid-solid
       # boundary, so it must be manually added to the no-slip BC tag list
       push!(noslip_extra_tags, tag)
     end
@@ -542,7 +568,72 @@ function stretchMHD(coord;domain=(0.0,1.0,0.0,1.0,0.0,1.0),factor=(1.0,1.0,1.0),
   return VectorValue(ncoord)
 end
 
-# Analytical solution
+# Post-processing and analytical solutions
+function postprocess_FD(xh, Ω)
+  uh, ph, jh, φh = xh
+  div_jh = ∇·jh
+  div_uh = ∇·uh
+
+  dΩ = Measure(Ω, 6)
+  uh_0 = sum(∫(uh)*dΩ)[3]/sum(∫(1.0)*dΩ)
+  kp = 1/uh_0
+
+  uh_n = uh/uh_0
+  ph_n = ph/uh_0
+  jh_n = jh/uh_0
+  φh_n = φh/uh_0
+
+  div_jh_n = div_jh/uh_0
+  div_uh_n = div_uh/uh_0
+
+  if cw_s == 0.0
+    u_a(x) = analytical_GeneralHunt_u(1.0, cw_Ha, -1.0, Ha, nsums, x)
+    e_u = u_a - uh_n
+  else
+    e_u = uh_n
+  end
+
+  cellfields = Vector{Pair}([
+    "uh"=>uh_n,
+    "e_u"=>e_u,
+    "ph"=>ph_n,
+    "jh"=>jh_n,
+    "phi"=>φh_n,
+    "div_jh"=>div_jh_n,
+    "div_uh"=>div_uh_n,
+  ])
+
+  return cellfields, uh_0, kp
+end
+
+function postprocess_3D(xh, model, Ω)
+  uh, ph, jh, φh = xh
+  div_jh = ∇·jh
+  div_uh = ∇·uh
+
+  dΩ = Measure(Ω,6)
+  uh_0 = sum(∫(uh)*dΩ)[3]/sum(∫(1.0)*dΩ)
+
+  # Compute the dimensionless pressure drop gradient from the outlet value
+  Grad_p = ∇·ph
+  Γ = Boundary(model, tags="outlet")
+  dΓ = Measure(Γ, 6)
+  kp = sum(∫(Grad_p)*dΓ)[3]/sum(∫(1.0)*dΓ)
+  kp_a = nothing
+  dev_kp = nothing
+
+  cellfields=[
+    "uh"=>uh,
+    "ph"=>ph,
+    "jh"=>jh,
+    "phi"=>φh,
+    "div_uh"=>div_uh,
+    "div_jh"=>div_jh,
+  ]
+
+  return cellfields, uh_0, kp, kp_a, dev_kp
+end
+
 function analytical_GeneralHunt_u(
   #General Hunt analytical formula (d_b = 0 for Shercliff)
   l::Float64,       # channel aspect ratio
