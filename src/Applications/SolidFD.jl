@@ -176,7 +176,7 @@ function _SolidFD(;
     :B=>dirB,
     :ζ=>0.0,
   )
-  if (tw_s > 0.0) | (tw_Ha > 0.0)
+  if (tw_s > 0.0) || (tw_Ha > 0.0)
     params[:fluid][:domain] = "fluid"
     σ_Ω = σ_field(model, Ω, cw_Ha, cw_s, tw_Ha, tw_s)
     params[:solid] = Dict(:domain=>"solid", :σ=>σ_Ω)
@@ -240,7 +240,7 @@ function _SolidFD(;
   dev_kp = 100*abs(kp_a - kp)/max(kp_a, kp)
 
   if vtk
-    if (tw_Ha > 0.0) & (tw_s > 0.0)
+    if (tw_Ha > 0.0) && (tw_s > 0.0)
       push!(cellfields, "σ"=>σ_Ω)
     end
     writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
@@ -364,14 +364,14 @@ function solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
   add_tag_from_tags!(labels, "Ha_ext_walls", tags_j_Ha)
   add_tag_from_tags!(labels, "side_ext_walls", tags_j_side)
 
-  if (tw_Ha > 0.0) | (tw_s > 0.0)
+  if (tw_Ha > 0.0) || (tw_s > 0.0)
     cell_entity = get_cell_entity(labels)
     # Label numbering
-    if (tw_Ha > 0.0) & (tw_s == 0.0)
+    if (tw_Ha > 0.0) && (tw_s == 0.0)
       solid_Ha = maximum(cell_entity) + 1
       solid_s = nothing
       fluid = solid_Ha + 1
-    elseif (tw_s > 0.0) & (tw_Ha == 0.0)
+    elseif (tw_s > 0.0) && (tw_Ha == 0.0)
       solid_Ha = nothing
       solid_s = maximum(cell_entity) + 1
       fluid = solid_s + 1
@@ -427,7 +427,7 @@ function wall_BC(
   cw_Ha::Real, cw_s::Real, tw_Ha::Real, tw_s::Real, τ_Ha::Real, τ_s::Real
 )
   function _wall_BC!(cw::Real, tw::Real, τ::Real, tag::String)
-    if (cw > 0.0) & (tw == 0.0)
+    if (cw > 0.0) && (tw == 0.0)
       push!(
         thinWall_options, Dict(
           :cw => cw,
@@ -472,7 +472,7 @@ function mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, stretch_fine)
     stretch_Ha = sqrt(Ha/(Ha-1))
     stretch_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
 
-    if (tw_s > 0.0) | (tw_Ha > 0.0)
+    if (tw_s > 0.0) || (tw_Ha > 0.0)
       coord = solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
     end
 
