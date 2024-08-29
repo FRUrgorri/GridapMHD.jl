@@ -227,9 +227,9 @@ function _SolidFD(;
 
   # Post process
   if FD
-    cellfields, uh_0, kp = postprocess_FD(xh, Ω)
+    cellfields, uh_0, kp = postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
   elseif Full3D
-    cellfields, uh_0, kp = postprocess_3D(xh, model, Ω)
+    cellfields, uh_0, kp = postprocess_3D(xh, model, Ω, b)
   end
 
   if cw_s == 0.0 && cw_Ha == 0.0
@@ -581,12 +581,16 @@ to the fluid domain.  This approach avoids creating a 'model_fluid' using tag
 'fluid', as suggested possible by Gridap Tutorial, which seems broken for
 GridapDistributed models.  However, that approach would be preferred.
 """
-function isfluid((x, y, z))
-  if (-1 <= x <= 1) && (-b <= y <= b)
-    return 1.0
-  else
-    return 0.0
+function isfluid(b)
+  function _isfluid((x, y, z))
+    if (-1 <= x <= 1) && (-b <= y <= b)
+      return 1.0
+    else
+      return 0.0
+    end
   end
+
+return _isfluid
 end
 
 # Post-processing and analytical solutions
@@ -596,13 +600,14 @@ end
 Post process operations and computations to be run after a fully developed
 approximation solution `xh` is obtained.  `Ω` is the model's interior.
 """
-function postprocess_FD(xh, Ω)
+function postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
   uh, ph, jh, φh = xh
   div_jh = ∇·jh
   div_uh = ∇·uh
 
+  _isfluid = isfluid(b)
   dΩ = Measure(Ω, 6)
-  uh_0 = sum(∫(uh*isfluid)*dΩ)[3]/sum(∫(isfluid)*dΩ)
+  uh_0 = sum(∫(uh*_isfluid)*dΩ)[3]/sum(∫(_isfluid)*dΩ)
   kp = 1/uh_0
 
   uh_n = uh/uh_0
@@ -634,24 +639,25 @@ function postprocess_FD(xh, Ω)
 end
 
 """
-  postprocess_3D(xh, model, Ω)
+  postprocess_3D(xh, model, Ω, b)
 
 Post process operations and computations to be run after a 3D solution `xh` is
 obtained.  `Ω` is the `model`'s interior.
 """
-function postprocess_3D(xh, model, Ω)
+function postprocess_3D(xh, model, Ω, b)
   uh, ph, jh, φh = xh
   div_jh = ∇·jh
   div_uh = ∇·uh
 
+  _isfluid = isfluid(b)
   dΩ = Measure(Ω, 6)
-  uh_0 = sum(∫(uh*isfluid)*dΩ)[3]/sum(∫(isfluid)*dΩ)
+  uh_0 = sum(∫(uh*_isfluid)*dΩ)[3]/sum(∫(_isfluid)*dΩ)
 
   # Compute the dimensionless pressure drop gradient from the outlet value
   Grad_p = ∇·ph
   Γ = Boundary(model, tags="outlet")
   dΓ = Measure(Γ, 6)
-  kp = sum(∫(Grad_p*isfluid)*dΓ)[3]/sum(∫(isfluid)*dΓ)
+  kp = sum(∫(Grad_p*_isfluid)*dΓ)[3]/sum(∫(_isfluid)*dΓ)
   kp_a = nothing
   dev_kp = nothing
 
