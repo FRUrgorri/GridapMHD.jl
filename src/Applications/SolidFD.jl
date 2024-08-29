@@ -460,7 +460,7 @@ function wall_BC(
   return insulated_tags, thinWall_options, noslip_extra_tags
 end
 
-# Mesher maps and helper funcs
+# Mesher maps and other helper funcs
 """
   mesh_map(coord)
 
@@ -570,6 +570,25 @@ function stretchMHD(coord;domain=(0.0,1.0,0.0,1.0,0.0,1.0),factor=(1.0,1.0,1.0),
   return VectorValue(ncoord)
 end
 
+"""
+  isfluid(X)
+
+Returns 1.0 if coordinates given by the three-component vector X fall within the
+fluid region or 0.0 otherwise.
+
+It is intended as a step function to limit integration or other operations only
+to the fluid domain.  This approach avoids creating a 'model_fluid' using tag
+'fluid', as suggested possible by Gridap Tutorial, which seems broken for
+GridapDistributed models.  However, that approach would be preferred.
+"""
+function isfluid((x, y, z))
+  if (-1 <= x <= 1) && (-b <= y <= b)
+    return 1.0
+  else
+    return 0.0
+  end
+end
+
 # Post-processing and analytical solutions
 function postprocess_FD(xh, Ω)
   uh, ph, jh, φh = xh
@@ -577,7 +596,7 @@ function postprocess_FD(xh, Ω)
   div_uh = ∇·uh
 
   dΩ = Measure(Ω, 6)
-  uh_0 = sum(∫(uh)*dΩ)[3]/sum(∫(1.0)*dΩ)
+  uh_0 = sum(∫(uh*isfluid)*dΩ)[3]/sum(∫(isfluid)*dΩ)
   kp = 1/uh_0
 
   uh_n = uh/uh_0
@@ -613,14 +632,14 @@ function postprocess_3D(xh, model, Ω)
   div_jh = ∇·jh
   div_uh = ∇·uh
 
-  dΩ = Measure(Ω,6)
-  uh_0 = sum(∫(uh)*dΩ)[3]/sum(∫(1.0)*dΩ)
+  dΩ = Measure(Ω, 6)
+  uh_0 = sum(∫(uh*isfluid)*dΩ)[3]/sum(∫(isfluid)*dΩ)
 
   # Compute the dimensionless pressure drop gradient from the outlet value
   Grad_p = ∇·ph
   Γ = Boundary(model, tags="outlet")
   dΓ = Measure(Γ, 6)
-  kp = sum(∫(Grad_p)*dΓ)[3]/sum(∫(1.0)*dΓ)
+  kp = sum(∫(Grad_p*isfluid)*dΓ)[3]/sum(∫(isfluid)*dΓ)
   kp_a = nothing
   dev_kp = nothing
 
