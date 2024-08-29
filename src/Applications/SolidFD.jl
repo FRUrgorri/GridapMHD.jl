@@ -590,6 +590,12 @@ function isfluid((x, y, z))
 end
 
 # Post-processing and analytical solutions
+"""
+  postprocess_FD(xh, Ω)
+
+Post process operations and computations to be run after a fully developed
+approximation solution `xh` is obtained.  `Ω` is the model's interior.
+"""
 function postprocess_FD(xh, Ω)
   uh, ph, jh, φh = xh
   div_jh = ∇·jh
@@ -627,6 +633,12 @@ function postprocess_FD(xh, Ω)
   return cellfields, uh_0, kp
 end
 
+"""
+  postprocess_3D(xh, model, Ω)
+
+Post process operations and computations to be run after a 3D solution `xh` is
+obtained.  `Ω` is the `model`'s interior.
+"""
 function postprocess_3D(xh, model, Ω)
   uh, ph, jh, φh = xh
   div_jh = ∇·jh
