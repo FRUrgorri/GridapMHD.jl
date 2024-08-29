@@ -119,7 +119,7 @@ function _SolidFD(;
       error("No solid elements allowed at inlet/outlet regions.")
     end
     if inlet == :parabolic
-      u_inlet((x,y,z)) = VectorValue(0, 0, 2.0*(1-x^2-y^2))
+      u_inlet((x,y,z)) = VectorValue(0, 0, (9/(16*b^3))*(x^2 - b^2)*(y^2 - 1))
     elseif inlet == :uniform
       u_inlet = VectorValue(0.0, 0.0, 1.0)
     end
