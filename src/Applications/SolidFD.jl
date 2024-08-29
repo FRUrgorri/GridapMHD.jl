@@ -250,12 +250,14 @@ function _SolidFD(;
     display(t)
   end
 
+  cellfields_dict = Dict(cellfields)
+
   info[:nc] = nc
   info[:ncells] = num_cells(model)
-  info[:ndofs_u] = length(get_free_dof_values(cellfields["uh"]))
-  info[:ndofs_p] = length(get_free_dof_values(cellfields["ph"]))
-  info[:ndofs_j] = length(get_free_dof_values(cellfields["jh"]))
-  info[:ndofs_φ] = length(get_free_dof_values(cellfields["φh"]))
+  info[:ndofs_u] = length(get_free_dof_values(cellfields_dict["uh"]))
+  info[:ndofs_p] = length(get_free_dof_values(cellfields_dict["ph"]))
+  info[:ndofs_j] = length(get_free_dof_values(cellfields_dict["jh"]))
+  info[:ndofs_φ] = length(get_free_dof_values(cellfields_dict["phi"]))
   info[:ndofs] = length(get_free_dof_values(xh))
   info[:Re] = Re
   info[:Ha] = Ha
