@@ -657,7 +657,7 @@ function postprocess_3D(xh, model, Ω, b)
   Grad_p = ∇·ph
   Γ = Boundary(model, tags="outlet")
   dΓ = Measure(Γ, 6)
-  kp = sum(∫(Grad_p*_isfluid)*dΓ)[3]/sum(∫(_isfluid)*dΓ)
+  kp = sum(∫(-Grad_p*_isfluid)*dΓ)[3]/sum(∫(_isfluid)*dΓ)
   kp_a = nothing
   dev_kp = nothing
 
@@ -668,6 +668,7 @@ function postprocess_3D(xh, model, Ω, b)
     "phi"=>φh,
     "div_uh"=>div_uh,
     "div_jh"=>div_jh,
+    "grad_p"=>Grad_p,
   ]
 
   return cellfields, uh_0, kp, kp_a, dev_kp
