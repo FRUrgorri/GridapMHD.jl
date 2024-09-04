@@ -113,6 +113,7 @@ function _SolidFD(;
   elseif Full3D
     _nc = nc
     _rank_partition = rank_partition
+    Re = Ha^2/N
     f = VectorValue(0.0, 0.0, 0.0)
     periodic = (false, false, false)
     if ns[3] > 0
