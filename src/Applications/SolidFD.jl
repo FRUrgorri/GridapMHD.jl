@@ -227,6 +227,8 @@ function _SolidFD(;
   tic!(t,barrier=true)
 
   # Post process
+  θⱼ = acosd(dirB·VectorValue(0.0, 1.0, 0.0))
+
   if FD
     cellfields, uh_0, kp = postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
   elseif Full3D
@@ -274,6 +276,7 @@ function _SolidFD(;
   info[:kp_a] = kp_a
   info[:dev_kp] = dev_kp
   info[:inlet] = inlet
+  info[:theta_y] = θⱼ
 
   return info, t
 end
