@@ -264,14 +264,16 @@ function _SolidFD(;
   info[:Ha] = Ha
   info[:N] = N
   info[:cw_s] = cw_s
-  info[:τ_s] = τ_s
   info[:cw_Ha] = cw_Ha
+  info[:τ_s] = τ_s
   info[:τ_Ha] = τ_Ha
   info[:b] = b
+  info[:L] = L
   info[:uh_0] = uh_0
   info[:kp] = kp
   info[:kp_a] = kp_a
   info[:dev_kp] = dev_kp
+  info[:inlet] = inlet
 
   return info, t
 end
