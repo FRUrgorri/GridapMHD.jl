@@ -50,6 +50,8 @@ function _SolidFD(;
   Ha = 10.0,
   Re = 1.0,
   N = nothing,
+  B_var = :uniform,
+  B_coef = nothing,
   dir_B = (0.0,1.0,0.0),
   b = 1.0,
   L = nothing,
@@ -77,6 +79,8 @@ function _SolidFD(;
   # 2*ns accounts for ns solid cells on each side of the liquid for each
   # direction
   nc = nl .+ (2 .* ns)
+
+  dirB = (1/norm(VectorValue(dir_B)))*VectorValue(dir_B)
 
   info = Dict{Symbol,Any}()
   params = Dict{Symbol,Any}(
@@ -110,6 +114,7 @@ function _SolidFD(;
     N = Ha^2/Re
     f = VectorValue(0.0, 0.0, 1.0)
     periodic = (false, false, true)
+    Bfield = dirB
   elseif Full3D
     _nc = nc
     _rank_partition = rank_partition
@@ -123,6 +128,14 @@ function _SolidFD(;
       u_inlet((x,y,z)) = VectorValue(0, 0, (9/(4*b^3))*(x^2 - b^2)*(y^2 - 1))
     elseif inlet == :uniform
       u_inlet = VectorValue(0.0, 0.0, 1.0)
+    end
+    if B_var == :uniform
+      Bfield = dirB
+    elseif B_var == :polynomial
+      # B_coef assumed to be normalized w.r.t. given Ha
+      Bfield(x) = dirB .* sum(B_coef[1] .* [x[3]^(i-1) for i in 1:length(B_coef)])
+    else
+      error("Unrecognized magnetic field input.")
     end
   else
     error(
@@ -147,7 +160,6 @@ function _SolidFD(;
   domain = domain_liq .+ (-tw_s, tw_s, -tw_Ha, tw_Ha, 0.0, 0.0)
 
   # Reduced quantities
-  dirB = (1/norm(VectorValue(dir_B)))*VectorValue(dir_B)
   α = 1.0/N
   β = 1.0/Ha^2
   γ = 1.0
@@ -174,7 +186,7 @@ function _SolidFD(;
     :β=>β,
     :γ=>γ,
     :f=>f,
-    :B=>dirB,
+    :B=>Bfield,
     :ζ=>0.0,
   )
   if (tw_s > 0.0) || (tw_Ha > 0.0)
@@ -280,6 +292,7 @@ function _SolidFD(;
 
   return info, t
 end
+
 
 # Conductivity to CellField
 """
