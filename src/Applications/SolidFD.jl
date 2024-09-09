@@ -133,7 +133,7 @@ function _SolidFD(;
       Bfield = dirB
     elseif B_var == :polynomial
       # B_coef assumed to be normalized w.r.t. given Ha
-      Bfield(x) = dirB .* sum(B_coef[1] .* [x[3]^(i-1) for i in 1:length(B_coef)])
+      Bfield(x) = dirB .* sum(B_coef .* [x[3]^(i-1) for i in 1:length(B_coef)])
     else
       error("Unrecognized magnetic field input.")
     end
