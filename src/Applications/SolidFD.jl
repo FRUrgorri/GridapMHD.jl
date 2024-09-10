@@ -288,6 +288,8 @@ function _SolidFD(;
   info[:kp_a] = kp_a
   info[:dev_kp] = dev_kp
   info[:inlet] = inlet
+  info[:B_var] = B_var
+  info[:B_coef] = B_coef
   info[:theta_y] = θⱼ
 
   return info, t
