@@ -50,6 +50,7 @@ function _SolidFD(;
   Ha = 10.0,
   Re = 1.0,
   N = nothing,
+  convection = true,
   B_var = :uniform,
   B_coef = nothing,
   dir_B = (0.0,1.0,0.0),
@@ -188,6 +189,7 @@ function _SolidFD(;
     :f=>f,
     :B=>Bfield,
     :ζ=>0.0,
+    :convection=>convection,
   )
   if (tw_s > 0.0) || (tw_Ha > 0.0)
     params[:fluid][:domain] = "fluid"
