@@ -198,7 +198,7 @@ function _SolidFD(;
   end
 
   # Boundary conditions
-  insulated_tags, thinWall_params, noslip_extra_tags = wall_BC(cw_Ha, cw_s, tw_Ha, tw_s, τ_Ha, τ_s)
+  insulated_tags, thinWall_params, noslip_extra_tags = wall_BC(model, cw_Ha, cw_s, tw_Ha, tw_s, τ_Ha, τ_s)
   noslip_tags = append!(["fluid-solid-boundary"], noslip_extra_tags)
   if FD
     u_BC = Dict(:tags=>noslip_tags)
@@ -377,7 +377,12 @@ function solidFD_add_tags!(
   return nothing
 end
 
-function solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
+function solidFD_add_tags!(
+  model::GridapDistributed.DistributedDiscreteModel,
+  b::Real,
+  tw_Ha::Real,
+  tw_s::Real,
+)
   labels = get_face_labeling(model)
   tags_inlet = append!(collect(1:20),[21])
   tags_outlet = append!(collect(1:20),[22])
@@ -427,13 +432,17 @@ function solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
       push!(solid_entities, solid_Ha)
     end
     if !isnothing(solid_s)
-      add_tag!(labels,"solid_s", [solid_s])
+      add_tag!(labels, "solid_s", [solid_s])
       push!(solid_entities, solid_s)
     end
-    add_tag!(labels,"solid", solid_entities)
-    add_tag!(labels,"fluid", [fluid])
+    add_tag!(labels, "solid", solid_entities)
+    add_tag!(labels, "fluid", [fluid])
     Meshers.add_non_slip_at_solid_entity!(model, solid_entities, fluid, noslip)
     add_tag!(labels, "fluid-solid-boundary", [noslip])
+  else
+    # If both walls are missing, "fluid-solid-boundary" tag is created empty
+    # The actual fluid-solid boundary is tagged w/ wall_BC()
+    add_tag_from_tags!(labels, "fluid-solid-boundary", Vector{Int}())
   end
 
   return nothing
@@ -449,7 +458,13 @@ Also selects the tags for the no-slip velocity BC which do not lie in a
 fluid-solid boundary, i.e., when tw=0.0 in that side.
 """
 function wall_BC(
-  cw_Ha::Real, cw_s::Real, tw_Ha::Real, tw_s::Real, τ_Ha::Real, τ_s::Real
+  model::GridapDistributed.DistributedDiscreteModel,
+  cw_Ha::Real,
+  cw_s::Real,
+  tw_Ha::Real,
+  tw_s::Real,
+  τ_Ha::Real,
+  τ_s::Real
 )
   function _wall_BC!(cw::Real, tw::Real, τ::Real, tag::String)
     if (cw > 0.0) && (tw == 0.0)
