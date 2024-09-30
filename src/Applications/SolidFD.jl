@@ -377,12 +377,7 @@ function solidFD_add_tags!(
   return nothing
 end
 
-function solidFD_add_tags!(
-  model::GridapDistributed.DistributedDiscreteModel,
-  b::Real,
-  tw_Ha::Real,
-  tw_s::Real,
-)
+function solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
   labels = get_face_labeling(model)
   tags_inlet = append!(collect(1:20),[21])
   tags_outlet = append!(collect(1:20),[22])
