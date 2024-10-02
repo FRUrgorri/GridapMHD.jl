@@ -502,6 +502,8 @@ Map function to pass to CartesianDiscreteModel.
 
 Combines the solid mesh map and the liquid stretchMHD map as required depending
 on the input tw_s, tw_Ha values and the stretch_γ exponent.
+
+stretch_γ determines the stretching in the Side boundary layer.
 """
 function mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, γ)
   function _mesh_map(coord)
@@ -512,8 +514,33 @@ function mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, γ)
       coord = solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
     end
 
-    coord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(stretch_γ,stretch_Ha),dirs=(1,2))
-    coord = stretchMHD(coord,domain=(0,b,0,1.0),factor=(stretch_γ,stretch_Ha),dirs=(1,2))
+    if γ > 0.0
+      coord = stretchMHD(
+        coord,
+        domain=(0, -b, 0, -1.0),
+        factor=(stretch_γ, stretch_Ha),
+        dirs=(1, 2),
+      )
+      coord = stretchMHD(
+        coord,
+        domain=(0, b, 0, 1.0),
+        factor=(stretch_γ, stretch_Ha),
+        dirs=(1, 2),
+      )
+    else
+      coord = stretchMHD(
+        coord,
+        domain=(0, -1.0),
+        factor=(stretch_Ha,),
+        dirs=(2,),
+      )
+      coord = stretchMHD(
+        coord,
+        domain=(0, 1.0),
+        factor=(stretch_Ha),
+        dirs=(2,),
+      )
+    end
 
     return coord
   end
