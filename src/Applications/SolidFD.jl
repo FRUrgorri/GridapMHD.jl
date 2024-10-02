@@ -66,7 +66,7 @@ function _SolidFD(;
   solver = :julia,
   verbose = true,
   mesh2vtk = false,
-  stretch_fine = false,
+  stretch_γ = 0.5,
   τ_Ha = 100.0,
   τ_s = 100.0,
   res_assemble = false,
@@ -166,7 +166,7 @@ function _SolidFD(;
   γ = 1.0
 
   # Prepare problem in terms of reduced quantities
-  _mesh_map = mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, stretch_fine)
+  _mesh_map = mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, stretch_γ)
   model = CartesianDiscreteModel(
     parts, _rank_partition, domain, _nc;
     isperiodic=periodic, map=_mesh_map
@@ -501,24 +501,19 @@ end
 Map function to pass to CartesianDiscreteModel.
 
 Combines the solid mesh map and the liquid stretchMHD map as required depending
-on the input tw_s, tw_Ha values and the stretch_fine toggle.
+on the input tw_s, tw_Ha values and the stretch_γ exponent.
 """
-function mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, stretch_fine)
+function mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, γ)
   function _mesh_map(coord)
     stretch_Ha = sqrt(Ha/(Ha-1))
-    stretch_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
+    stretch_γ = sqrt(Ha^γ/(Ha^γ-1))
 
     if (tw_s > 0.0) || (tw_Ha > 0.0)
       coord = solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
     end
 
-    if stretch_fine
-      coord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(stretch_Ha,stretch_Ha),dirs=(1,2))
-      coord = stretchMHD(coord,domain=(0,b,0,1.0),factor=(stretch_Ha,stretch_Ha),dirs=(1,2))
-    else
-      coord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(stretch_side,stretch_Ha),dirs=(1,2))
-      coord = stretchMHD(coord,domain=(0,b,0,1.0),factor=(stretch_side,stretch_Ha),dirs=(1,2))
-    end
+    coord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(stretch_γ,stretch_Ha),dirs=(1,2))
+    coord = stretchMHD(coord,domain=(0,b,0,1.0),factor=(stretch_γ,stretch_Ha),dirs=(1,2))
 
     return coord
   end
