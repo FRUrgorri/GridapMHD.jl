@@ -69,7 +69,6 @@ Available forms for the external magnetic field (`B_var`):
 function Solid(;
   backend = nothing,
   np = nothing,
-  parts = nothing,
   title = "Solid",
   nruns = 1,
   path = ".",
