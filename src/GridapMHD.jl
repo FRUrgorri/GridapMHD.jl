@@ -50,8 +50,8 @@ include("Applications/transient.jl")
 include("Applications/channel.jl")
 include("Applications/FullyDevelopedFlow.jl")
 include("Applications/Tube.jl")
-include("Applications/SolidFD.jl")
+include("Applications/Solid.jl")
 
-export hunt, expansion, cavity, tube, FullyDeveloped, SolidFD
+export hunt, expansion, cavity, tube, FullyDeveloped, Solid
 
 end # module

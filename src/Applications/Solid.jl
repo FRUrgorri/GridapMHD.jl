@@ -1,8 +1,8 @@
-function SolidFD(;
+function Solid(;
   backend = nothing,
   np = nothing,
   parts = nothing,
-  title = "SolidFD",
+  title = "Solid",
   nruns = 1,
   path = ".",
   kwargs...)
@@ -11,17 +11,17 @@ function SolidFD(;
     _title = title*"_r$ir"
     if isa(backend,Nothing)
       @assert isa(np,Nothing)
-      info, t = _SolidFD(;title=_title,path=path,kwargs...)
+      info, t = _Solid(;title=_title,path=path,kwargs...)
     else
       @assert backend ∈ [:sequential,:mpi]
       @assert !isa(np,Nothing)
       if backend === :sequential
         info, t = with_debug() do distribute
-          _SolidFD(;distribute=distribute,rank_partition=np,title=_title,path=path,kwargs...)
+          _Solid(;distribute=distribute,rank_partition=np,title=_title,path=path,kwargs...)
         end
       else
         info,t = with_mpi() do distribute
-          _SolidFD(;distribute=distribute,rank_partition=np,title=_title,path=path,kwargs...)
+          _Solid(;distribute=distribute,rank_partition=np,title=_title,path=path,kwargs...)
         end
       end
     end
@@ -40,8 +40,8 @@ function SolidFD(;
   nothing
 end
 
-function _SolidFD(;
-  title = "SolidFD",
+function _Solid(;
+  title = "Solid",
   path = ".",
   distribute = nothing,
   rank_partition = nothing,
