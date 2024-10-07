@@ -1,3 +1,71 @@
+"""
+  Solid(; <keyword arguments>)
+
+Driver capable of running 3D cases and fully developed approximation cases with solid
+coupling in a rectangular geometry.
+
+# Arguments
+- `backend = nothing`: backend for parallelization. Values: nothing, :sequential or :mpi.
+- `np = nothing: array describing mesh partitioning for parallelization.
+- `title = "Solid": job title used for saved files.
+- `nruns = 1: number of runs.
+- `path = ".": path where saved files are stored.
+- `nl = (4,4)`: array with the number of nodes in the liquid region for each direction.
+- `ns = (2,2)`: array with the number of nodes in the solid region for each direction.
+- `Ha = 10.0`: Hartmann number.
+- `Re = 1.0`: Reynolds number.
+- `N = nothing`: interaction parameter.
+- `convection = true`: toggle for the weak form convective term.
+- `B_var = :uniform`: external magnetic field form.
+- `B_coef = nothing`: coefficients describing the external magnetic field function.
+- `dir_B = (0.0,1.0,0.0)`: external magnetic field direction vector.
+- `b = 1.0`: half-width in the direction perpendicular to the external magnetic field.
+- `L = nothing`: length in the axial direction.
+- `tw_Ha = 0.0`: width of the solid wall in the external magnetic field direction.
+- `tw_s = 0.0`: width of the solid wall normal to the external magnetic field.
+- `cw_Ha = 0.0`: wall parameter in the external magnetic field direction.
+- `cw_s = 0.0`: wall parameter normal to the external magnetic field.
+- `inlet = nothing`: velocity inlet boundary condition function.
+- `vtk = true`: toggle to save the final results in vtk format.
+- `solve = true`: toggle to run the solver.
+- `solver = :julia`: solver to be used and additional solver parameters.
+- `verbose = true`: print time statistics.
+- `mesh2vtk = false`: save the generated model in vtk format.
+- `stretch_γ = 0.5`: stretching factor for the Side boundary layer.
+- `τ_Ha = 100.0`: penalty term for the thin wall boundary condition in the Ha boundary.
+- `τ_s = 100.0`: penalty term for the thin wall boundary condition in the Side boundary.
+- `res_assemble = false`: toggle to time the computation of the residual independently.
+- `jac_assemble = false`: toggle to time the computation of the jacobian independently.
+- `nsums = 10`: number of terms used for the analytical solution computation.
+
+# Fully developed approximation
+For the fully developed approximation, the following arguments need be set:
+- `nc`, and `np` must be 2-dimensional arrays.
+- `L`, `inlet`, and `N` must be set to `nothing`.
+- `Re` must be set to `1.0`.
+
+# 3D simulation
+If a full 3D simulation is to be run, the following arguments need be set:
+- `nc`, and `np` must be 3-dimensional arrays.
+- `L`, and `N` must be numbers.
+- `inlet` must be set to one of the available boundary condition keys (see #Inlet).
+- `Re` must be set to `nothing`.
+
+# Inlet
+Available keys for the inlet velocity boundary condition:
+- `:uniform`: uniform value in the cross section.
+- `:parabolic`: parabolic profile of a fully developed flow.
+
+# External magnetic field
+Available forms for the external magnetic field (`B_var`):
+- `:uniform`:
+  uniform value in the whole computational domain.
+  `B_coef` is thus ignored.
+- `:polynomial`:
+  external magnetic field magnitude varies along the axial direction following a
+  polynomic function.
+  `B_coef` determines the coefficients of said polynomial in increasing order.
+"""
 function Solid(;
   backend = nothing,
   np = nothing,
