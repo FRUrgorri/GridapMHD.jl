@@ -338,10 +338,10 @@ function _Solid(;
 
   info[:nc] = nc
   info[:ncells] = num_cells(model)
-  info[:ndofs_u] = length(get_free_dof_values(cellfields_dict["uh"]))
-  info[:ndofs_p] = length(get_free_dof_values(cellfields_dict["ph"]))
-  info[:ndofs_j] = length(get_free_dof_values(cellfields_dict["jh"]))
-  info[:ndofs_φ] = length(get_free_dof_values(cellfields_dict["phi"]))
+  info[:ndofs_u] = length(get_free_dof_values(xh[1]))
+  info[:ndofs_p] = length(get_free_dof_values(xh[2]))
+  info[:ndofs_j] = length(get_free_dof_values(xh[3]))
+  info[:ndofs_φ] = length(get_free_dof_values(xh[4]))
   info[:ndofs] = length(get_free_dof_values(xh))
   info[:Re] = Re
   info[:Ha] = Ha
