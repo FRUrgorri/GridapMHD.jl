@@ -23,7 +23,7 @@ echo ""
 
 SECONDS=0
 
-ENV_FILE="env_me.sh"
+ENV_FILE="env_GGZ.sh"
 source ${ENV_FILE}
 
 nHa="50"
@@ -47,7 +47,7 @@ mkdir -p "$DATAPATH"
 #  -mat_mumps_icntl_14 50
 
 JULIA_SCRIPT="
-using GridapMHD: SolidFD
+using GridapMHD: Solid
 using SparseMatricesCSR
 using GridapPETSc
 using Gridap
@@ -71,7 +71,7 @@ solver = Dict(
     ),
 )
 
-SolidFD(;
+Solid(;
   title = \"${JOB_NAME}\",
   path = \"${DATAPATH}/\",
   backend = :mpi,
