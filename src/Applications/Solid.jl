@@ -694,10 +694,11 @@ function stretchMHD(coord;domain=(0.0,1.0,0.0,1.0,0.0,1.0),factor=(1.0,1.0,1.0),
 end
 
 """
-  isfluid(X)
+  isfluid(b)
 
-Returns 1.0 if coordinates given by the three-component vector X fall within the
-fluid region or 0.0 otherwise.
+Returns a step-function which depends on a three-component vector x.  Such function
+returns 1.0 if the coordinates given by the vector x fall within the fluid region
+and 0.0 otherwise.  The fluid region is defined by -1 < x[1] < 1, -b < x[2] < b.
 
 It is intended as a step function to limit integration or other operations only
 to the fluid domain.  This approach avoids creating a 'model_fluid' using tag
@@ -713,7 +714,7 @@ function isfluid(b)
     end
   end
 
-return _isfluid
+  return _isfluid
 end
 
 # Post-processing and analytical solutions
