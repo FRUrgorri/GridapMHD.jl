@@ -32,6 +32,7 @@ coupling in a rectangular geometry.
 - `verbose = true`: print time statistics.
 - `mesh2vtk = false`: save the generated model in vtk format.
 - `stretch_γ = 0.5`: stretching factor for the Side boundary layer.
+- `strethc_δ`: length of the stretching region as a multiple of the boundary layer width.
 - `τ_Ha = 100.0`: penalty term for the thin wall boundary condition in the Ha boundary.
 - `τ_s = 100.0`: penalty term for the thin wall boundary condition in the Side boundary.
 - `res_assemble = false`: toggle to time the computation of the residual independently.
@@ -134,6 +135,7 @@ function _Solid(;
   verbose = true,
   mesh2vtk = false,
   stretch_γ = 0.5,
+  stretch_δ = 1.0,
   τ_Ha = 100.0,
   τ_s = 100.0,
   res_assemble = false,
@@ -233,7 +235,7 @@ function _Solid(;
   γ = 1.0
 
   # Prepare problem in terms of reduced quantities
-  _mesh_map = mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, stretch_γ)
+  _mesh_map = mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, stretch_γ, stretch_δ)
   model = CartesianDiscreteModel(
     parts, _rank_partition, domain, _nc;
     isperiodic=periodic, map=_mesh_map
@@ -563,19 +565,28 @@ end
 
 # Mesher maps and other helper funcs
 """
-  mesh_map(coord)
+  mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, γ, δ)
 
-Map function to pass to CartesianDiscreteModel.
+Function that returns a map function to pass to `CartesianDiscreteModel` defining
+the mesh stretching to accomodate more nodes towards the boundary layers, and to
+define a uniform mesh on the solid region.  The returned function depends only of
+one argument (the coordinates) as expected by `CartesianDiscreteModel`.
 
-Combines the solid mesh map and the liquid stretchMHD map as required depending
-on the input tw_s, tw_Ha values and the stretch_γ exponent.
-
-stretch_γ determines the stretching in the Side boundary layer.
+# Arguments
+- `b`: half-width in the direction perpendicular to the external magnetic field.
+- `tw_Ha`: width of the solid wall in the external magnetic field direction.
+- `tw_s`: width of the solid wall normal to the external magnetic field.
+- `nc`: array containing the total number of cells.
+- `nl`: array containing the number of cells in the fluid region.
+- `ns`: array containing the number of cells in the solid region.
+- `domain`: array describing the computational domain: (x0, xf, y0, yf, z0, zf).
+- `γ`: exponent for the stretching factor.
+- `δ`: length of the stretching region as a multiple of the boundary layer width.
 """
-function mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, γ)
+function mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, γ, δ)
   function _mesh_map(coord)
     stretch_Ha = sqrt(Ha/(Ha-1))
-    stretch_γ = sqrt(Ha^γ/(Ha^γ-1))
+    stretch_γ = 1/sqrt(1 - δ/Ha^γ)
 
     if (tw_s > 0.0) || (tw_Ha > 0.0)
       coord = solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
