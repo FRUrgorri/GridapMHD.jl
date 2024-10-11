@@ -680,7 +680,25 @@ function solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
   return VectorValue(ncoord)
 end
 
-function stretchMHD(coord;domain=(0.0,1.0,0.0,1.0,0.0,1.0),factor=(1.0,1.0,1.0),dirs=(1,2,3))
+"""
+  stretchMHD(coord; domain, factor, dirs)
+
+Particular case of a mesh stretching rule described in "G.O. Roberts, Computational meshes
+for boundary layer problems, _Proceedings of the Second International Conference on
+Numerical Methods Fluid Dynamics, Lecture Notes on Physics, vol. 8, Springer-Verlag, New
+York, 1971, pp. 171–177."
+
+# Arguments
+- `coord`: coordinate set describing the mesh to stretch.
+- `domain`: domain over which the stretching is computed.
+- `dirs`: directions over which the stretching is computed.
+"""
+function stretchMHD(
+  coord;
+  domain=(0.0, 1.0, 0.0, 1.0, 0.0, 1.0),
+  factor=(1.0, 1.0, 1.0),
+  dirs=(1, 2, 3),
+)
   ncoord = collect(coord.data)
   for (i,dir) in enumerate(dirs)
     ξ0 = domain[i*2-1]
