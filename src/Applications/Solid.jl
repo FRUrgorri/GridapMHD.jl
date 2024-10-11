@@ -73,7 +73,8 @@ function Solid(;
   title = "Solid",
   nruns = 1,
   path = ".",
-  kwargs...)
+  kwargs...
+)
 
   for ir in 1:nruns
     _title = title*"_r$ir"
@@ -142,7 +143,7 @@ function _Solid(;
   jac_assemble = false,
   nsums = 10,
   #petsc_options="-snes_monitor -ksp_error_if_not_converged true -ksp_converged_reason -ksp_type preonly -pc_type lu -pc_factor_mat_solver_type mumps"
-  )
+)
 
   # The total number of mesh elements is the liquid region elements plus
   # ns elements in the direction of the solid domain.
