@@ -31,8 +31,8 @@ coupling in a rectangular geometry.
 - `solver = :julia`: solver to be used and additional solver parameters.
 - `verbose = true`: print time statistics.
 - `mesh2vtk = false`: save the generated model in vtk format.
-- `stretch_γ = 0.5`: stretching factor for the Side boundary layer.
-- `strethc_δ`: length of the stretching region as a multiple of the boundary layer width.
+- `fluid_stretching = :Roberts`: stretching rule for the fluid mesh.
+- `fluid_stretch_params = (0.5, 1.0)`: parameters for the fluid mesh stretching.
 - `τ_Ha = 100.0`: penalty term for the thin wall boundary condition in the Ha boundary.
 - `τ_s = 100.0`: penalty term for the thin wall boundary condition in the Side boundary.
 - `res_assemble = false`: toggle to time the computation of the residual independently.
@@ -66,6 +66,11 @@ Available forms for the external magnetic field (`B_var`):
   external magnetic field magnitude varies along the axial direction following a
   polynomic function.
   `B_coef` determines the coefficients of said polynomial in increasing order.
+
+# Mesh stretching
+There are two available rules for liquid mesh stretching:
+- `:Roberts`: mesh refinement in the boundary layer region.
+- `:hyperbolic`: tanh rule for separation of mesh elements.
 """
 function Solid(;
   backend = nothing,
@@ -135,8 +140,8 @@ function _Solid(;
   solver = :julia,
   verbose = true,
   mesh2vtk = false,
-  stretch_γ = 0.5,
-  stretch_δ = 1.0,
+  fluid_stretching = :Roberts,
+  fluid_stretch_params = (0.5, 1.0),
   τ_Ha = 100.0,
   τ_s = 100.0,
   res_assemble = false,
@@ -236,7 +241,19 @@ function _Solid(;
   γ = 1.0
 
   # Prepare problem in terms of reduced quantities
-  _mesh_map = mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, stretch_γ, stretch_δ)
+  @assert fluid_stretching ∈ (:Roberts, :hyperbolic)
+  _mesh_map = mesh_map(
+    Ha,
+    b,
+    tw_Ha,
+    tw_s,
+    nc,
+    nl,
+    ns,
+    domain,
+    fluid_stretching,
+    fluid_stretch_params,
+  )
   model = CartesianDiscreteModel(
     parts, _rank_partition, domain, _nc;
     isperiodic=periodic, map=_mesh_map
@@ -584,29 +601,65 @@ one argument (the coordinates) as expected by `CartesianDiscreteModel`.
 - `γ`: exponent for the stretching factor.
 - `δ`: length of the stretching region as a multiple of the boundary layer width.
 """
-function mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, γ, δ)
+function mesh_map(
+    Ha,
+    b,
+    tw_Ha,
+    tw_s,
+    nc,
+    nl,
+    ns,
+    domain,
+    fluid_stretching,
+    fluid_stretch_params,
+)
   function _mesh_map(coord)
-    stretch_Ha = sqrt(Ha/(Ha-1))
-    stretch_γ = 1/sqrt(1 - δ/Ha^γ)
-
     if (tw_s > 0.0) || (tw_Ha > 0.0)
       coord = solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
     end
 
-    if γ > 0.0
-      coord = stretchMHD(
-        coord,
-        domain=(0, -b, 0, -1.0),
-        factor=(stretch_γ, stretch_Ha),
-        dirs=(1, 2),
-      )
-      coord = stretchMHD(
-        coord,
-        domain=(0, b, 0, 1.0),
-        factor=(stretch_γ, stretch_Ha),
-        dirs=(1, 2),
-      )
-    else
+    stretch_Ha = sqrt(Ha/(Ha-1))
+    if fluid_stretching == :Roberts
+      @assert length(fluid_stretch_params) == 2
+      γ, δ = fluid_stretch_params
+      stretch_γ = 1/sqrt(1 - δ/Ha^γ)
+
+      if γ > 0.0
+        coord = stretchMHD(
+          coord,
+          domain=(0, -b, 0, -1.0),
+          factor=(stretch_γ, stretch_Ha),
+          dirs=(1, 2),
+        )
+        coord = stretchMHD(
+          coord,
+          domain=(0, b, 0, 1.0),
+          factor=(stretch_γ, stretch_Ha),
+          dirs=(1, 2),
+        )
+      else
+        coord = stretchMHD(
+          coord,
+          domain=(0, -1.0),
+          factor=(stretch_Ha,),
+          dirs=(2,),
+        )
+        coord = stretchMHD(
+          coord,
+          domain=(0, 1.0),
+          factor=(stretch_Ha),
+          dirs=(2,),
+        )
+      end
+    elseif fluid_stretching == :hyperbolic
+      @assert length(fluid_stretch_params) == 2
+      l_BL, n_δ = fluid_stretch_params
+      δ = 1/sqrt(Ha)
+
+      xnew = map_hyp(b, l_BL, δ, nl[1]; n_δ=n_δ)
+      # print(xnew)
+      coord = stretch_map(coord, xnew, b, 1)
+
       coord = stretchMHD(
         coord,
         domain=(0, -1.0),
@@ -677,6 +730,64 @@ function solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
       ncoord[2] = y0 + tw_Ha + nl[2]*dyl + (ny - nl[2] - ns[2])*dys
     end
   end
+  return VectorValue(ncoord)
+end
+
+"""
+  map_hyp(xf, l_BL, δ, nl; n_δ=2.0)
+
+Hyperbolic element distribution aimed for the liquid region.
+
+The aim is to distribute the mesh elements so that their separation follows a tanh rule
+with a minimum near the fluid-solid boundary (given by `xf`).  `l_BL` determines the initial
+element separation; `δ` determines where the inflection point lies; `nl` gives the number of
+elements; and the keyword argument `n_δ` can modify the slope of the separation distribution.
+"""
+function map_hyp(xf::Real, l_BL::Real, δ::Real, nl::Real; n_δ=2.0)
+  function _l(x)
+    cell_length = (l_core - l_BL)/2*(1 - tanh((x - xf + n_δ*δ)/δ)) + l_BL
+
+    return cell_length
+  end
+
+  n = ceil(Int, nl/2)
+  l_core = 2*(xf - n*l_BL)/n + l_BL  # Initial guess
+
+  xnew = Vector{Float64}(undef, n)
+  xnew[end] = xf
+  for i in 1:(n - 1)
+    xnew[end - i] = xnew[end - i + 1] - _l(xnew[end - i + 1])
+  end
+
+  l_core_final = (xnew[2] - xnew[1])/(xf - xnew[1])  # Final guess
+  if iseven(nl)
+    # Renormalize so that xnew[1] = l_core
+    Δx₀ = l_core_final
+  else
+    # Renormalize so that xnew[1] = l_core/2
+    Δx₀ = l_core_final/2
+  end
+  xnew = ((xnew .- xnew[1])./(xf - xnew[1]) .+ Δx₀)./(xf + Δx₀)
+
+  return xnew
+end
+
+"""
+  stretch_map(coord, xnew, xf, dir)
+
+Stretch the mesh symmetrically following the distribution given by `xnew` in the region
+`(-xf, xf)` along the `dir` direction.  `xnew` is assumed to give the `(0, xf)`
+distribution.
+"""
+function stretch_map(coord, xnew, xf::Real, dir::Integer)
+  n = length(xnew)
+  ncoord = collect(coord.data)
+  if 0.0 < coord[dir] <= xf
+    ncoord[dir] = xnew[round(Int, coord[dir]*n/xf)]
+  elseif -xf <= coord[dir] < 0.0
+    ncoord[dir] = -xnew[round(Int, abs(coord[dir])*n/xf)]
+  end
+
   return VectorValue(ncoord)
 end
 
