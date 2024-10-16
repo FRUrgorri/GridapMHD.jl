@@ -583,7 +583,7 @@ end
 
 # Mesher maps and other helper funcs
 """
-  mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, γ, δ)
+  mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, fluid_stretching, fluid_stretch_params)
 
 Function that returns a map function to pass to `CartesianDiscreteModel` defining
 the mesh stretching to accomodate more nodes towards the boundary layers, and to
@@ -598,8 +598,8 @@ one argument (the coordinates) as expected by `CartesianDiscreteModel`.
 - `nl`: array containing the number of cells in the fluid region.
 - `ns`: array containing the number of cells in the solid region.
 - `domain`: array describing the computational domain: (x0, xf, y0, yf, z0, zf).
-- `γ`: exponent for the stretching factor.
-- `δ`: length of the stretching region as a multiple of the boundary layer width.
+- `fluid_stretching`: stretching rule.
+- `fluid_stretch_params`: stretching parameters (rule dependent).
 """
 function mesh_map(
     Ha,
