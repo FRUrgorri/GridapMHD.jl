@@ -241,7 +241,6 @@ function _Solid(;
   γ = 1.0
 
   # Prepare problem in terms of reduced quantities
-  @assert fluid_stretching ∈ (:Roberts, :hyperbolic)
   _mesh_map = mesh_map(
     Ha,
     b,
@@ -618,12 +617,8 @@ function mesh_map(
       coord = solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
     end
 
-    stretch_Ha = sqrt(Ha/(Ha-1))
-    if fluid_stretching == :Roberts
-      @assert length(fluid_stretch_params) == 2
-      γ, δ = fluid_stretch_params
-      stretch_γ = 1/sqrt(1 - δ/Ha^γ)
-
+    if fluid_stretching == :uniform
+    elseif fluid_stretching == :Roberts
       if γ > 0.0
         coord = stretchMHD(
           coord,
@@ -638,43 +633,29 @@ function mesh_map(
           dirs=(1, 2),
         )
       else
-        coord = stretchMHD(
-          coord,
-          domain=(0, -1.0),
-          factor=(stretch_Ha,),
-          dirs=(2,),
-        )
-        coord = stretchMHD(
-          coord,
-          domain=(0, 1.0),
-          factor=(stretch_Ha),
-          dirs=(2,),
-        )
+        coord = stretchMHD(coord, domain=(0, -1.0), factor=(stretch_Ha,), dirs=(2,))
+        coord = stretchMHD(coord, domain=(0, 1.0), factor=(stretch_Ha,), dirs=(2,))
       end
     elseif fluid_stretching == :hyperbolic
-      @assert length(fluid_stretch_params) == 2
-      l_BL, n_δ = fluid_stretch_params
-      δ = 1/sqrt(Ha)
-
-      xnew = map_hyp(b, l_BL, δ, nl[1]; n_δ=n_δ)
-      # print(xnew)
-      coord = stretch_map(coord, xnew, b, 1)
-
-      coord = stretchMHD(
-        coord,
-        domain=(0, -1.0),
-        factor=(stretch_Ha,),
-        dirs=(2,),
-      )
-      coord = stretchMHD(
-        coord,
-        domain=(0, 1.0),
-        factor=(stretch_Ha),
-        dirs=(2,),
-      )
+      coord = stretch_map(coord, x_hyp, b, 1)
+      coord = stretchMHD(coord, domain=(0, -1.0), factor=(stretch_Ha,), dirs=(2,))
+      coord = stretchMHD(coord, domain=(0, 1.0), factor=(stretch_Ha,), dirs=(2,))
     end
 
     return coord
+  end
+
+  @assert fluid_stretching ∈ (:uniform, :Roberts, :hyperbolic)
+  stretch_Ha = sqrt(Ha/(Ha-1))
+  if fluid_stretching == :Roberts
+    @assert length(fluid_stretch_params) == 2
+    γ, δ = fluid_stretch_params
+    stretch_γ = 1/sqrt(1 - δ/Ha^γ)
+  elseif fluid_stretching == :hyperbolic
+    @assert length(fluid_stretch_params) == 2
+    l_BL, n_δ = fluid_stretch_params
+    δ = 1/sqrt(Ha)
+    x_hyp = map_hyp(b, l_BL, δ, nl[1]; n_δ=n_δ)
   end
 
   return _mesh_map
