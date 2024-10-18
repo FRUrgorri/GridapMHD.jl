@@ -201,7 +201,10 @@ function _Solid(;
       Bfield = dirB
     elseif B_var == :polynomial
       # B_coef assumed to be normalized w.r.t. given Ha
-      Bfield(x) = dirB .* sum(B_coef .* [x[3]^(i-1) for i in 1:length(B_coef)])
+      Bfield = x -> dirB .* sum(B_coef .* [x[3]^(i-1) for i in 1:length(B_coef)])
+    elseif B_var == :tanh
+      # B_coef[1] roughly determines the length over which B > 0
+      Bfield = x -> dirB*(0.5*(1 - tanh(abs(2*x[3]/B_coef[1] - 1)/0.1 - 5)))
     else
       error("Unrecognized magnetic field input.")
     end
