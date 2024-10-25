@@ -33,6 +33,7 @@ coupling in a rectangular geometry.
 - `mesh2vtk = false`: save the generated model in vtk format.
 - `fluid_stretching = :Roberts`: stretching rule for the fluid mesh.
 - `fluid_stretch_params = (0.5, 1.0)`: parameters for the fluid mesh stretching.
+- `μ = 0.0`: stabilization method coefficient.  Defaults to no stabilization.
 - `τ_Ha = 100.0`: penalty term for the thin wall boundary condition in the Ha boundary.
 - `τ_s = 100.0`: penalty term for the thin wall boundary condition in the Side boundary.
 - `res_assemble = false`: toggle to time the computation of the residual independently.
@@ -142,6 +143,7 @@ function _Solid(;
   mesh2vtk = false,
   fluid_stretching = :Roberts,
   fluid_stretch_params = (0.5, 1.0),
+  μ = 0.0,
   τ_Ha = 100.0,
   τ_s = 100.0,
   res_assemble = false,
@@ -281,6 +283,10 @@ function _Solid(;
     params[:fluid][:domain] = "fluid"
     σ_Ω = σ_field(model, Ω, cw_Ha, cw_s, tw_Ha, tw_s)
     params[:solid] = Dict(:domain=>"solid", :σ=>σ_Ω)
+  end
+  if μ > 0
+    ĥ = b/nl[1]
+    params[:bcs][:stabilization] = Dict(:μ=>μ*ĥ)
   end
 
   # Boundary conditions
