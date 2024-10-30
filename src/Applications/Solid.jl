@@ -388,6 +388,7 @@ function _Solid(;
   info[:B_var] = B_var
   info[:B_coef] = B_coef
   info[:theta_y] = θⱼ
+  info[:μ] = μ,
 
   return info, t
 end
