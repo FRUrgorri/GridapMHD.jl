@@ -284,10 +284,6 @@ function _Solid(;
     σ_Ω = σ_field(model, Ω, cw_Ha, cw_s, tw_Ha, tw_s)
     params[:solid] = Dict(:domain=>"solid", :σ=>σ_Ω)
   end
-  if μ > 0
-    ĥ = b/nl[1]
-    params[:bcs][:stabilization] = Dict(:μ=>μ*ĥ)
-  end
 
   # Boundary conditions
   insulated_tags, thinWall_params, noslip_extra_tags = wall_BC(model, cw_Ha, cw_s, tw_Ha, tw_s, τ_Ha, τ_s)
@@ -312,6 +308,12 @@ function _Solid(;
     :j=>j_BC,
     :thin_wall=>thinWall_params,
   )
+
+  # Stabilization method
+  if μ > 0
+    ĥ = b/nl[1]
+    params[:bcs][:stabilization] = Dict(:μ=>μ*ĥ, :domain=>"fluid")
+  end
 
   toc!(t,"pre_process")
 
