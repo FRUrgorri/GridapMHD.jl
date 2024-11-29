@@ -203,8 +203,31 @@ function _Solid(;
       # B_coef assumed to be normalized w.r.t. given Ha
       Bfield = x -> dirB .* sum(B_coef .* [x[3]^(i-1) for i in 1:length(B_coef)])
     elseif B_var == :tanh
-      # B_coef[1] roughly determines the length over which B > 0
-      Bfield = x -> dirB*(0.5*(1 - tanh(abs(2*x[3]/B_coef[1] - 1)/0.1 - 5)))
+      # x = B_coef[1] is where the field maximum is.
+      # B_coef[2] controls the height of the curve.
+      # B_coef[3] determines the width of the pulse.
+      # B_coef[4] determines the fringe steepness.
+      Bfield = function (x)
+        (x₀, α, β, γ) = B_coef
+        return dirB*(1 + α*tanh(γ*(β - abs(x[3] - x₀))))/(1 + α*tanh(γ*β))
+      end
+    elseif B_var == :tanhMaPLE
+      # x = B_coef[1] is where the field maximum is.
+      # B_coef[2] is how far from x₀ the function takes half its value.
+      # B_coef[3] determines how flat the plateau is.
+      Bfield = function (x)
+        (x₀, α, β) = B_coef
+        return dirB*(0.5*(1 - tanh((abs(x[3] - x₀) - α)/β)))
+      end
+    elseif B_var == :arctan
+      # x = B_coef[1] is where the field maximum is.
+      # B_coef[2] controls the height of the curve.
+      # B_coef[3] determines the width of the pulse.
+      # B_coef[4] determines the fringe steepness.
+      Bfield = function (x)
+        (x₀, α, β, γ) = B_coef
+        return dirB*(1 + α*atan(γ*(β - abs(x[3] - x₀))))/(1 + α*atan(γ*β))
+      end
     else
       error("Unrecognized magnetic field input.")
     end
