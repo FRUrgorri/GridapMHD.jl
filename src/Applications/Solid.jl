@@ -192,44 +192,46 @@ function _Solid(;
     if ns[3] > 0
       error("No solid elements allowed at inlet/outlet regions.")
     end
+
+    # Inlet BC
     if inlet == :parabolic
       u_inlet((x,y,z)) = VectorValue(0, 0, (9/(4*b^3))*(x^2 - b^2)*(y^2 - 1))
     elseif inlet == :uniform
       u_inlet = VectorValue(0.0, 0.0, 1.0)
     end
+
+    # External magnetic field
     if B_var == :uniform
-      Bfield = dirB
+      Bfunc = dirB
     elseif B_var == :polynomial
       # B_coef assumed to be normalized w.r.t. given Ha
-      Bfield = x -> dirB .* sum(B_coef .* [x[3]^(i-1) for i in 1:length(B_coef)])
+      Bfunc = x -> dirB .* sum(B_coef .* [x[3]^(i-1) for i in 1:length(B_coef)])
     elseif B_var == :tanh
-      # x = B_coef[1] is where the field maximum is.
-      # B_coef[2] controls the height of the curve.
-      # B_coef[3] determines the width of the pulse.
-      # B_coef[4] determines the fringe steepness.
-      Bfield = function (x)
+      Bfunc = function (x)
         (x₀, α, β, γ) = B_coef
         return dirB*(1 + α*tanh(γ*(β - abs(x[3] - x₀))))/(1 + α*tanh(γ*β))
       end
     elseif B_var == :tanhMaPLE
-      # x = B_coef[1] is where the field maximum is.
-      # B_coef[2] is how far from x₀ the function takes half its value.
-      # B_coef[3] determines how flat the plateau is.
-      Bfield = function (x)
+      # x₀ = B_coef[1] is where the field maximum is.
+      # α = B_coef[2] is how far from x₀ the function takes half its value.
+      # β = B_coef[3] determines how flat the plateau is.
+      Bfunc = function (x)
         (x₀, α, β) = B_coef
         return dirB*(0.5*(1 - tanh((abs(x[3] - x₀) - α)/β)))
       end
     elseif B_var == :arctan
-      # x = B_coef[1] is where the field maximum is.
-      # B_coef[2] controls the height of the curve.
-      # B_coef[3] determines the width of the pulse.
-      # B_coef[4] determines the fringe steepness.
-      Bfield = function (x)
+      Bfunc = function (x)
         (x₀, α, β, γ) = B_coef
         return dirB*(1 + α*atan(γ*(β - abs(x[3] - x₀))))/(1 + α*atan(γ*β))
       end
     else
       error("Unrecognized magnetic field input.")
+    end
+    Bfield = Bfunc
+    """
+    Curl free
+    """
+    function B_correction(B)
     end
   else
     error(
