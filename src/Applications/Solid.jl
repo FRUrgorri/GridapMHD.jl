@@ -353,6 +353,9 @@ function _Solid(;
     if (tw_Ha > 0.0) && (tw_s > 0.0)
       push!(cellfields, "σ"=>σ_Ω)
     end
+    if B_var != :uniform
+      push!(cellfields, "B"=>CellField(Bfield, Ω))
+    end
     writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
     toc!(t,"vtk")
   end
