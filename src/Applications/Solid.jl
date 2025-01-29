@@ -18,7 +18,7 @@ coupling in a rectangular geometry.
 - `convection = true`: toggle for the weak form convective term.
 - `B_var = :uniform`: external magnetic field form.
 - `B_coef = nothing`: coefficients describing the external magnetic field function.
-- `dir_B = (0.0,1.0,0.0)`: external magnetic field direction vector.
+- `dir_B = (0.0,1.0,0.0)`: external magnetic field direction vector for :uniform cases.
 - `b = 1.0`: half-width in the direction perpendicular to the external magnetic field.
 - `L = nothing`: length in the axial direction.
 - `tw_Ha = 0.0`: width of the solid wall in the external magnetic field direction.
@@ -61,10 +61,18 @@ Available forms for the external magnetic field (`B_var`):
 - `:uniform`:
   uniform value in the whole computational domain.
   `B_coef` is thus ignored.
+  `dirB` sets the direction of the magnetic field, the remaining rules produce an axially
+  varying B field mostly parallel to Y, except for a curl-free correction.
 - `:polynomial`:
   external magnetic field magnitude varies along the axial direction following a
   polynomic function.
   `B_coef` determines the coefficients of said polynomial in increasing order.
+- `:tanh`:
+  4-parameter fit.
+- `:arctan`:
+  4-parameter fit.
+- `:tanhMaPLE`
+  3-parameter fit.
 """
 function Solid(;
   backend = nothing,
@@ -202,14 +210,14 @@ function _Solid(;
 
     # External magnetic field
     if B_var == :uniform
-      Bfunc = dirB
+      Bfield = dirB
     elseif B_var == :polynomial
       # B_coef assumed to be normalized w.r.t. given Ha
-      Bfunc = x -> dirB .* sum(B_coef .* [x[3]^(i-1) for i in 1:length(B_coef)])
+      Bfunc = x -> sum(B_coef .* [x^(i-1) for i in 1:length(B_coef)])
     elseif B_var == :tanh
       Bfunc = function (x)
         (x₀, α, β, γ) = B_coef
-        return dirB*(1 + α*tanh(γ*(β - abs(x[3] - x₀))))/(1 + α*tanh(γ*β))
+        return (1 + α*tanh(γ*(β - abs(x - x₀))))/(1 + α*tanh(γ*β))
       end
     elseif B_var == :tanhMaPLE
       # x₀ = B_coef[1] is where the field maximum is.
@@ -217,22 +225,21 @@ function _Solid(;
       # β = B_coef[3] determines how flat the plateau is.
       Bfunc = function (x)
         (x₀, α, β) = B_coef
-        return dirB*(0.5*(1 - tanh((abs(x[3] - x₀) - α)/β)))
+        return (0.5*(1 - tanh((abs(x - x₀) - α)/β)))
       end
     elseif B_var == :arctan
       Bfunc = function (x)
         (x₀, α, β, γ) = B_coef
-        return dirB*(1 + α*atan(γ*(β - abs(x[3] - x₀))))/(1 + α*atan(γ*β))
+        return (1 + α*atan(γ*(β - abs(x - x₀))))/(1 + α*atan(γ*β))
       end
     else
       error("Unrecognized magnetic field input.")
     end
-    Bfield = Bfunc
-    """
-    Curl free
-    """
-    function B_correction(B)
+
+    if B_var != :uniform
+      Bfield = curl_free_B(Bfunc)
     end
+
   else
     error(
       "Input args are not compatible with either a 3D computation or a \
@@ -746,6 +753,34 @@ function isfluid(b)
 
 return _isfluid
 end
+
+# Magnetic field correction
+"""
+  curl_free_B(B)
+
+Given `B`, a 1D magnetic field fit, it returns a function with a curl free correction
+for a magnetic field consistent with real fields [1].
+
+[1]: X. Albets-Chico et al. (2011), Fusion Eng. Des. 86(1), 5-14.
+"""
+function curl_free_B(B)
+  dB(x) = ForwardDiff.derivative(B, x)
+  d²B(x) = ForwardDiff.derivative(dB, x)
+  d³B(x) = ForwardDiff.derivative(d²B, x)
+  d⁴B(x) = ForwardDiff.derivative(d³B, x)
+
+  function _curl_free_B(x)
+    B₁ = 0.0
+    B₂ = B(x[3]) - d²B(x[3])*x[2]^2/2 + d⁴B(x[3])*x[2]^4/24
+    B₃ = dB(x[3])*x[2] - d³B(x[3])*x[2]^3/6
+
+    return VectorValue(B₁, B₂, B₃)
+  end
+
+  return _curl_free_B
+end
+
+
 
 # Post-processing and analytical solutions
 """
