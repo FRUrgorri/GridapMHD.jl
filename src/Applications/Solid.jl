@@ -19,6 +19,7 @@ coupling in a rectangular geometry.
 - `B_var = :uniform`: external magnetic field form.
 - `B_coef = nothing`: coefficients describing the external magnetic field function.
 - `dir_B = (0.0,1.0,0.0)`: external magnetic field direction vector for :uniform cases.
+- `curl_free = false`: implement a curl-free correction on the magnetic field.
 - `b = 1.0`: half-width in the direction perpendicular to the external magnetic field.
 - `L = nothing`: length in the axial direction.
 - `tw_Ha = 0.0`: width of the solid wall in the external magnetic field direction.
@@ -137,6 +138,7 @@ function _Solid(;
   B_var = :uniform,
   B_coef = nothing,
   dir_B = (0.0,1.0,0.0),
+  curl_free = false,
   b = 1.0,
   L = nothing,
   tw_Ha = 0.0,
@@ -247,7 +249,11 @@ function _Solid(;
     end
 
     if B_var != :uniform
-      Bfield = curl_free_B(Bfunc)
+      if curl_free
+        Bfield = curl_free_B(Bfunc)
+      else
+        Bfield = x -> VectorValue(0.0, Bfunc(x[3]), 0.0)
+      end
     end
 
   else
@@ -886,7 +892,7 @@ function isfluid(b)
   return _isfluid
 end
 
-# Magnetic field correction
+# Magnetic field curl free correction
 """
   curl_free_B(B)
 
