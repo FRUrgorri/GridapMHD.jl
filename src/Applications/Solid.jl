@@ -493,7 +493,6 @@ function isfluid(b)
   return _isfluid
 end
 
-
 # Post-processing and analytical solutions
 """
   postprocess_FD(xh, Ω)
