@@ -307,9 +307,11 @@ _interior(model,domain) = Interior(model,tags=domain)
 _boundary(model,domain::TriangulationTypes) = domain
 _boundary(model,domain) = Boundary(model,tags=domain)
 
-_skeleton(model,domain::TriangulationTypes) = SkeletonTriangulation(domain)
+# SkeletonTriangulation(model, domain::TriangulationTypes) not defined for distr. models
+_skeleton(model::DiscreteModel,domain::TriangulationTypes) = SkeletonTriangulation(domain)
 _skeleton(model,domain::Nothing) = SkeletonTriangulation(model)
-_skeleton(model,domain) = _skeleton(model,_interior(model,domain))
+_skeleton(model::DiscreteModel,domain) = _skeleton(model,_interior(model,domain))
+_skeleton(model, domain) = SkeletonTriangulation(model)
 
 # Random vector generation
 
