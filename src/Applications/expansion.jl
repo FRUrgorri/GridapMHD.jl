@@ -190,26 +190,32 @@ function _expansion(;
   tic!(t,barrier=true)
 
   # Post-process
-   uh,ph,jh,φh = xh
+  uh,ph,jh,φh = xh
   div_jh = ∇·jh
   div_uh = ∇·uh
   Grad_p = ∇·ph
 
   if vtk
-    writevtk(Ω,joinpath(path,title),
+    writevtk(
+      Ω,joinpath(path,title),
       order=order,
       cellfields=[
-        "uh"=>uh,"ph"=>ph,"jh"=>jh,"phi"=>φh,"div_uh"=>div_uh,"div_jh"=>div_jh,"kp"=>Grad_p])
+        "uh"=>uh,"ph"=>ph,"jh"=>jh,"phi"=>φh,"div_uh"=>div_uh,"div_jh"=>div_jh,"kp"=>Grad_p],
+      append=false
+    )
     toc!(t,"vtk")
   end
   if savelines
-    xline,yline,zline = evaluation_lines(model,Z)
-    info[:xline] = xline
-    info[:yline] = yline
-    info[:zline] = zline
-    info[:uh_xline] = vector_field_eval(uh,xline)
-    info[:uh_yline] = vector_field_eval(uh,yline)
-    info[:uh_zline] = vector_field_eval(uh,zline)
+    line = top_ha_line(model,Z)
+    info[:line] = line
+    info[:p_on_top] = ph(line)
+    # xline,yline,zline = evaluation_lines(model,Z)
+    # info[:xline] = xline
+    # info[:yline] = yline
+    # info[:zline] = zline
+    # info[:uh_xline] = vector_field_eval(uh,xline)
+    # info[:uh_yline] = vector_field_eval(uh,yline)
+    # info[:uh_zline] = vector_field_eval(uh,zline)
   end
   if verbose
     display(t)
@@ -240,7 +246,7 @@ function expansion_mesh(::Val{:gmsh},mesh::Dict,ranks,params)
   # after and before the expansion respectively.
   msh_name = mesh[:base_mesh]
   msh_file = joinpath(meshes_dir,"Expansion_"*msh_name*".msh") |> normpath
-  model = GmshDiscreteModel(ranks,msh_file)
+  model = GmshDiscreteModel(ranks,msh_file;has_affine_map=true)
   params[:model] = model
   return model
 end
@@ -250,7 +256,7 @@ function epansion_mesh(::Val{:p4est_SG},mesh::Dict,ranks,params)
   num_refs = mesh[:num_refs]
   if haskey(mesh,:base_mesh)
     msh_file = joinpath(meshes_dir,"Expansion_"*mesh[:base_mesh]*".msh") |> normpath
-    base_model = GmshDiscreteModel(msh_file)
+    base_model = GmshDiscreteModel(msh_file;has_affine_map=true)
     add_tag_from_tags!(get_face_labeling(base_model),"interior",["PbLi"])
     add_tag_from_tags!(get_face_labeling(base_model),"boundary",["inlet","outlet","wall"])
   else
@@ -267,7 +273,7 @@ function expansion_mesh(::Val{:p4est_MG},mesh::Dict,ranks,params)
   ranks_per_level = mesh[:ranks_per_level]
   if haskey(mesh,:base_mesh)
     msh_file = joinpath(meshes_dir,"Expansion_"*mesh[:base_mesh]*".msh") |> normpath
-    base_model = GmshDiscreteModel(msh_file)
+    base_model = GmshDiscreteModel(msh_file;has_affine_map=true)
     add_tag_from_tags!(get_face_labeling(base_model),"interior",["PbLi"])
     add_tag_from_tags!(get_face_labeling(base_model),"boundary",["inlet","outlet","wall"])
   else
@@ -311,6 +317,24 @@ function u_inlet(inlet,Ha,Z,β) # It ensures avg(u) = 1 in the outlet channel in
     U = u_inlet_cte
   end
  U
+end
+
+function top_line(model,n=100)
+  pmin,pmax = _get_bounding_box(model)
+  xmin,xmax = pmin[1],pmax[1]
+  zmax = pmax[3]
+  line = map(x->Point(x,0.0,zmax), range(xmin,xmax,n+1))
+  return line
+end
+
+function top_ha_line(model,Z,n=100)
+  pmin,pmax = _get_bounding_box(model)
+  xmin,xmax = pmin[1],pmax[1]
+  ymax = pmax[2]
+  # line = map( x -> x>0 ? Point(x,ymax,0.0) : Point(x,ymax/Z,0.0), range(xmin,xmax,n+1))
+  # line = map( x -> x>0 ? Point(x,1.0,0.0) : Point(x,0.25,0.0), range(xmin,xmax,n+1))
+  line = map( x -> x>0 ? Point(x,0.99,0.0) : Point(x,0.25,0.0), range(xmin,xmax,n+1))
+  return line
 end
 
 function evaluation_lines(model,Z,n=100)
