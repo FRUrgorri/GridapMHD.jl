@@ -16,3 +16,6 @@ end
 
 include("hunt_li2019_tests.jl")
 HuntLi2019TestsMPI.main(parts)
+
+include("solid_tests.jl")
+
