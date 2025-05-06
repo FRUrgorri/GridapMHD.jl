@@ -825,48 +825,6 @@ function stretch_map(coord, xnew, xf::Real, dir::Integer)
   return VectorValue(ncoord)
 end
 
-"""
-  stretchMHD(coord; domain, factor, dirs)
-
-Particular case of a mesh stretching rule described in "G.O. Roberts, Computational meshes
-for boundary layer problems, _Proceedings of the Second International Conference on
-Numerical Methods Fluid Dynamics, Lecture Notes on Physics, vol. 8, Springer-Verlag, New
-York, 1971, pp. 171–177."
-
-# Arguments
-- `coord`: coordinate set describing the mesh to stretch.
-- `domain`: domain over which the stretching is computed.
-- `dirs`: directions over which the stretching is computed.
-"""
-function stretchMHD(
-  coord;
-  domain=(0.0, 1.0, 0.0, 1.0, 0.0, 1.0),
-  factor=(1.0, 1.0, 1.0),
-  dirs=(1, 2, 3),
-)
-  ncoord = collect(coord.data)
-  for (i,dir) in enumerate(dirs)
-    ξ0 = domain[i*2-1]
-    ξ1 = domain[i*2]
-    l =  ξ1 - ξ0
-    c = (factor[i] + 1)/(factor[i] - 1)
-
-    if l > 0
-      if ξ0 <= coord[dir] <= ξ1
-        ξx = (coord[dir] - ξ0)/l                     # ξx from 0 to 1 uniformly distributed
-        ξx_streched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx streched from 0 to 1 towards 1
-        ncoord[dir] =  ξx_streched*l + ξ0            # coords streched towards ξ1
-      end
-    else
-      if ξ1 <= coord[dir] <= ξ0
-        ξx = (coord[dir] - ξ0)/l                     # ξx from 0 to 1 uniformly distributed
-        ξx_streched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx streched from 0 to 1 towards 1
-        ncoord[dir] =  ξx_streched*l + ξ0            # coords streched towards ξ1
-      end
-    end
-  end
-  return VectorValue(ncoord)
-end
 
 """
   isfluid(b)

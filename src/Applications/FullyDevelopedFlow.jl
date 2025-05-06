@@ -109,14 +109,14 @@ function _FullyDeveloped(;
    strech_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
 
   function map1(coord)
-     ncoord = strechMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
-     ncoord = strechMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
+     ncoord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
+     ncoord = stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
      ncoord  
    end
 
   function map_fine(coord)
-     ncoord = strechMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_Ha,strech_Ha),dirs=(1,2))
-     ncoord = strechMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_Ha,strech_Ha),dirs=(1,2))
+     ncoord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_Ha,strech_Ha),dirs=(1,2))
+     ncoord = stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_Ha,strech_Ha),dirs=(1,2))
      ncoord
   end
 
@@ -279,29 +279,4 @@ function _FullyDeveloped(;
   info[:kp_a] =kp_a
   info[:dev_kp] = dev_kp 
   info, t
-end
-
-function strechMHD(coord;domain=(0.0,1.0,0.0,1.0,0.0,1.0),factor=(1.0,1.0,1.0),dirs=(1,2,3))
-  ncoord = collect(coord.data)
-  for (i,dir) in enumerate(dirs)
-    ξ0 = domain[i*2-1]
-    ξ1 = domain[i*2]
-    l =  ξ1 - ξ0
-    c = (factor[i] + 1)/(factor[i] - 1)
-
-    if l > 0
-      if ξ0 <= coord[dir] <= ξ1
-        ξx = (coord[dir] - ξ0)/l                     # ξx from 0 to 1 uniformly distributed
-        ξx_streched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx streched from 0 to 1 towards 1
-        ncoord[dir] =  ξx_streched*l + ξ0            # coords streched towards ξ1
-      end
-    else
-      if ξ1 <= coord[dir] <= ξ0
-        ξx = (coord[dir] - ξ0)/l                     # ξx from 0 to 1 uniformly distributed
-        ξx_streched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx streched from 0 to 1 towards 1
-        ncoord[dir] =  ξx_streched*l + ξ0            # coords streched towards ξ1
-      end
-    end
-  end
-  return VectorValue(ncoord)
 end
