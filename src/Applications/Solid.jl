@@ -16,8 +16,7 @@ coupling in a rectangular geometry.
 - `Re = 1.0`: Reynolds number.
 - `N = nothing`: interaction parameter.
 - `convection = true`: toggle for the weak form convective term.
-- `B_var = :uniform`: external magnetic field form.
-- `B_coef = nothing`: coefficients describing the external magnetic field function.
+- `B_func = :uniform`: external magnetic field function (or `:uniform`).
 - `dir_B = (0.0,1.0,0.0)`: external magnetic field direction vector for :uniform cases.
 - `curl_free = false`: implement a curl-free correction on the magnetic field.
 - `b = 1.0`: half-width in the direction perpendicular to the external magnetic field.
@@ -58,24 +57,6 @@ If a full 3D simulation is to be run, the following arguments need be set:
 Available keys for the inlet velocity boundary condition:
 - `:uniform`: uniform value in the cross section.
 - `:parabolic`: parabolic profile of a fully developed flow.
-
-# External magnetic field
-Available forms for the external magnetic field (`B_var`):
-- `:uniform`:
-  uniform value in the whole computational domain.
-  `B_coef` is thus ignored.
-  `dirB` sets the direction of the magnetic field, the remaining rules produce an axially
-  varying B field mostly parallel to Y, except for a curl-free correction.
-- `:polynomial`:
-  external magnetic field magnitude varies along the axial direction following a
-  polynomic function.
-  `B_coef` determines the coefficients of said polynomial in increasing order.
-- `:tanh`:
-  4-parameter fit.
-- `:arctan`:
-  4-parameter fit.
-- `:tanhMaPLE`
-  3-parameter fit.
 
 # Mesh stretching
 There are two available rules for liquid mesh stretching:
@@ -135,8 +116,7 @@ function _Solid(;
   Re = 1.0,
   N = nothing,
   convection = true,
-  B_var = :uniform,
-  B_coef = nothing,
+  B_func = :uniform,
   dir_B = (0.0,1.0,0.0),
   curl_free = false,
   b = 1.0,
@@ -221,16 +201,14 @@ function _Solid(;
     end
 
     # External magnetic field
-    if B_var == :uniform
+    if B_func == :uniform
       Bfield = dirB
-    elseif B_var == :polynomial
-      Bfunc = B_polynomial(α...)
-    elseif B_var == :tanh
-      Bfunc = B_tanh(B_coef...)
-    elseif B_var == :tanhMaPLE
-      Bfunc = B_tanh_MaPLE(B_coef...)
-    elseif B_var == :arctan
-      Bfunc = B_arctan(B_coef...)
+    elseif isa(B_func, Function)
+      if curl_free
+        Bfield = curl_free_B(B_func)
+      else
+        Bfield = x -> VectorValue(dirB)*B_func(x[3])
+      end
     else
       error("Unrecognized magnetic field input.")
     end
