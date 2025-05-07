@@ -148,10 +148,10 @@ function _Solid(;
   # direction
   nc = nl .+ (2 .* ns)
 
-  if !isa(dirB, VectorValue)
-    dirB = VectorValue(dirB)
+  if !isa(dir_B, VectorValue)
+    dir_B = VectorValue(dir_B)
   end
-  dirB = (1/norm(dir_B))*dir_B
+  dir_B = (1/norm(dir_B))*dir_B
 
   info = Dict{Symbol,Any}()
   params = Dict{Symbol,Any}(
@@ -185,7 +185,7 @@ function _Solid(;
     N = Ha^2/Re
     f = VectorValue(0.0, 0.0, 1.0)
     periodic = (false, false, true)
-    Bfield = dirB
+    Bfield = dir_B
   elseif Full3D
     _nc = nc
     _rank_partition = rank_partition
@@ -205,18 +205,18 @@ function _Solid(;
 
     # External magnetic field
     if B_func == :uniform
-      Bfield = dirB
+      Bfield = dir_B
     elseif isa(B_func, Function)
       if curl_free
         Bfield = curl_free_B(B_func)
       else
-        Bfield = x -> dirB*B_func(x[3])
+        Bfield = x -> dir_B*B_func(x[3])
       end
     else
       error("Unrecognized magnetic field input.")
     end
 
-    if B_var != :uniform
+    if B_func != :uniform
       if curl_free
         Bfield = curl_free_B(Bfunc)
       else
@@ -346,7 +346,7 @@ function _Solid(;
   tic!(t,barrier=true)
 
   # Post process
-  θⱼ = acosd(dirB·VectorValue(0.0, 1.0, 0.0))
+  θⱼ = acosd(dir_B·VectorValue(0.0, 1.0, 0.0))
 
   if FD
     cellfields, uh_0, kp = postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
@@ -365,7 +365,7 @@ function _Solid(;
     if (tw_Ha > 0.0) && (tw_s > 0.0)
       push!(cellfields, "σ"=>σ_Ω)
     end
-    if B_var != :uniform
+    if B_func != :uniform
       push!(cellfields, "B"=>CellField(Bfield, Ω))
     end
     writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
@@ -399,8 +399,11 @@ function _Solid(;
   info[:dev_kp] = dev_kp
   info[:convection] = convection
   info[:inlet] = inlet
-  info[:B_var] = B_var
-  info[:B_coef] = B_coef
+  if isa(B_func, Symbol)
+    info[:B_func] = B_func
+  else
+    info[:B_func] = "Custom function"
+  end
   info[:theta_y] = θⱼ
   info[:μ] = μ
 
