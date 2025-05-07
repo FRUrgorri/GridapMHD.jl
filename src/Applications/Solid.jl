@@ -16,8 +16,7 @@ coupling in a rectangular geometry.
 - `Re = 1.0`: Reynolds number.
 - `N = nothing`: interaction parameter.
 - `convection = true`: toggle for the weak form convective term.
-- `B_var = :uniform`: external magnetic field form.
-- `B_coef = nothing`: coefficients describing the external magnetic field function.
+- `B_func = :uniform`: external magnetic field function (or `:uniform`).
 - `dir_B = (0.0,1.0,0.0)`: external magnetic field direction vector for :uniform cases.
 - `curl_free = false`: implement a curl-free correction on the magnetic field.
 - `b = 1.0`: half-width in the direction perpendicular to the external magnetic field.
@@ -58,24 +57,6 @@ If a full 3D simulation is to be run, the following arguments need be set:
 Available keys for the inlet velocity boundary condition:
 - `:uniform`: uniform value in the cross section.
 - `:parabolic`: parabolic profile of a fully developed flow.
-
-# External magnetic field
-Available forms for the external magnetic field (`B_var`):
-- `:uniform`:
-  uniform value in the whole computational domain.
-  `B_coef` is thus ignored.
-  `dirB` sets the direction of the magnetic field, the remaining rules produce an axially
-  varying B field mostly parallel to Y, except for a curl-free correction.
-- `:polynomial`:
-  external magnetic field magnitude varies along the axial direction following a
-  polynomic function.
-  `B_coef` determines the coefficients of said polynomial in increasing order.
-- `:tanh`:
-  4-parameter fit.
-- `:arctan`:
-  4-parameter fit.
-- `:tanhMaPLE`
-  3-parameter fit.
 
 # Mesh stretching
 There are two available rules for liquid mesh stretching:
@@ -135,8 +116,7 @@ function _Solid(;
   Re = 1.0,
   N = nothing,
   convection = true,
-  B_var = :uniform,
-  B_coef = nothing,
+  B_func = :uniform,
   dir_B = (0.0,1.0,0.0),
   curl_free = false,
   b = 1.0,
@@ -168,7 +148,10 @@ function _Solid(;
   # direction
   nc = nl .+ (2 .* ns)
 
-  dirB = (1/norm(VectorValue(dir_B)))*VectorValue(dir_B)
+  if !isa(dir_B, VectorValue)
+    dir_B = VectorValue(dir_B)
+  end
+  dir_B = (1/norm(dir_B))*dir_B
 
   info = Dict{Symbol,Any}()
   params = Dict{Symbol,Any}(
@@ -202,7 +185,7 @@ function _Solid(;
     N = Ha^2/Re
     f = VectorValue(0.0, 0.0, 1.0)
     periodic = (false, false, true)
-    Bfield = dirB
+    Bfield = dir_B
   elseif Full3D
     _nc = nc
     _rank_partition = rank_partition
@@ -221,34 +204,19 @@ function _Solid(;
     end
 
     # External magnetic field
-    if B_var == :uniform
-      Bfield = dirB
-    elseif B_var == :polynomial
-      # B_coef assumed to be normalized w.r.t. given Ha
-      Bfunc = x -> sum(B_coef .* [x^(i-1) for i in 1:length(B_coef)])
-    elseif B_var == :tanh
-      Bfunc = function (x)
-        (x₀, α, β, γ) = B_coef
-        return (1 + α*tanh(γ*(β - abs(x - x₀))))/(1 + α*tanh(γ*β))
-      end
-    elseif B_var == :tanhMaPLE
-      # x₀ = B_coef[1] is where the field maximum is.
-      # α = B_coef[2] is how far from x₀ the function takes half its value.
-      # β = B_coef[3] determines how flat the plateau is.
-      Bfunc = function (x)
-        (x₀, α, β) = B_coef
-        return (0.5*(1 - tanh((abs(x - x₀) - α)/β)))
-      end
-    elseif B_var == :arctan
-      Bfunc = function (x)
-        (x₀, α, β, γ) = B_coef
-        return (1 + α*atan(γ*(β - abs(x - x₀))))/(1 + α*atan(γ*β))
+    if B_func == :uniform
+      Bfield = dir_B
+    elseif isa(B_func, Function)
+      if curl_free
+        Bfield = curl_free_B(B_func)
+      else
+        Bfield = x -> dir_B*B_func(x[3])
       end
     else
       error("Unrecognized magnetic field input.")
     end
 
-    if B_var != :uniform
+    if B_func != :uniform
       if curl_free
         Bfield = curl_free_B(Bfunc)
       else
@@ -284,7 +252,7 @@ function _Solid(;
   γ = 1.0
 
   # Prepare problem in terms of reduced quantities
-  _mesh_map = mesh_map(
+  _mesh_map = Meshers.solid_mesh_map(
     Ha,
     b,
     tw_Ha,
@@ -300,7 +268,7 @@ function _Solid(;
     parts, _rank_partition, domain, _nc;
     isperiodic=periodic, map=_mesh_map
   )
-  solidFD_add_tags!(model, b, tw_Ha, tw_s)
+  Meshers.solid_add_tags!(model, b, tw_Ha, tw_s)
   Ω = Interior(model)
 
   if mesh2vtk
@@ -327,7 +295,9 @@ function _Solid(;
   end
 
   # Boundary conditions
-  insulated_tags, thinWall_params, noslip_extra_tags = wall_BC(model, cw_Ha, cw_s, tw_Ha, tw_s, τ_Ha, τ_s)
+  insulated_tags, thinWall_params, noslip_extra_tags = Meshers.solid_wall_BC(
+    model, cw_Ha, cw_s, tw_Ha, tw_s, τ_Ha, τ_s
+  )
   noslip_tags = append!(["fluid-solid-boundary"], noslip_extra_tags)
   if FD
     u_BC = Dict(:tags=>noslip_tags)
@@ -376,7 +346,7 @@ function _Solid(;
   tic!(t,barrier=true)
 
   # Post process
-  θⱼ = acosd(dirB·VectorValue(0.0, 1.0, 0.0))
+  θⱼ = acosd(dir_B·VectorValue(0.0, 1.0, 0.0))
 
   if FD
     cellfields, uh_0, kp = postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
@@ -395,7 +365,7 @@ function _Solid(;
     if (tw_Ha > 0.0) && (tw_s > 0.0)
       push!(cellfields, "σ"=>σ_Ω)
     end
-    if B_var != :uniform
+    if B_func != :uniform
       push!(cellfields, "B"=>CellField(Bfield, Ω))
     end
     writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
@@ -429,8 +399,11 @@ function _Solid(;
   info[:dev_kp] = dev_kp
   info[:convection] = convection
   info[:inlet] = inlet
-  info[:B_var] = B_var
-  info[:B_coef] = B_coef
+  if isa(B_func, Symbol)
+    info[:B_func] = B_func
+  else
+    info[:B_func] = "Custom function"
+  end
   info[:theta_y] = θⱼ
   info[:μ] = μ
 
@@ -438,7 +411,7 @@ function _Solid(;
 end
 
 
-# Conductivity to CellField
+# Helper functions
 """
   σ_field(model, Ω, cw_Ha::Real, cw_s::Real, tw_Ha::Real, tw_s::Real)
 
@@ -496,378 +469,6 @@ function σ_field(model, Ω, cw_Ha::Real, cw_s::Real, tw_Ha::Real, tw_s::Real)
   return GridapDistributed.DistributedCellField(σ_f, Ω)
 end
 
-# Tag related functions
-"""
-  solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
-
-Assign tags to entities for every possible combination of tw_Ha and tw_s.
-In the process, it identifies the mesh elements corresponding to the solid
-region.
-"""
-function solidFD_add_tags!(
-  model::GridapDistributed.DistributedDiscreteModel,
-  b::Real,
-  tw_Ha::Real,
-  tw_s::Real,
-)
-  map(local_views(model)) do model
-    solidFD_add_tags!(model, b, tw_Ha, tw_s)
-  end
-
-  return nothing
-end
-
-function solidFD_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
-  labels = get_face_labeling(model)
-  tags_inlet = append!(collect(1:20),[21])
-  tags_outlet = append!(collect(1:20),[22])
-  # These are the external walls, i.e., not necesarily the fluid-solid boundary
-  tags_j_Ha = append!(collect(1:20), [23,24])
-  tags_j_side = append!(collect(1:20), [25,26])
-  add_tag_from_tags!(labels, "inlet", tags_inlet)
-  add_tag_from_tags!(labels, "outlet", tags_outlet)
-  add_tag_from_tags!(labels, "Ha_ext_walls", tags_j_Ha)
-  add_tag_from_tags!(labels, "side_ext_walls", tags_j_side)
-
-  if (tw_Ha > 0.0) || (tw_s > 0.0)
-    cell_entity = get_cell_entity(labels)
-    # Label numbering
-    if (tw_Ha > 0.0) && (tw_s == 0.0)
-      solid_Ha = maximum(cell_entity) + 1
-      solid_s = nothing
-      fluid = solid_Ha + 1
-    elseif (tw_s > 0.0) && (tw_Ha == 0.0)
-      solid_Ha = nothing
-      solid_s = maximum(cell_entity) + 1
-      fluid = solid_s + 1
-    else
-      solid_Ha = maximum(cell_entity) + 1
-      solid_s = solid_Ha + 1
-      fluid = solid_s + 1
-    end
-    noslip = fluid + 1
-
-    function set_entities(xs)
-      tol = 1.0e-9
-      if all(x->(x[1]>b-tol)||x[1]<-b+tol,xs)
-        solid_s
-      elseif all(x->(x[2]>b-tol)||x[2]<-b+tol,xs)
-        solid_Ha
-      else
-        fluid
-      end
-    end
-
-    grid = get_grid(model)
-    cell_coords = get_cell_coordinates(grid)
-    copyto!(cell_entity, map(set_entities, cell_coords))
-    solid_entities = Vector{Int}()
-    if !isnothing(solid_Ha)
-      add_tag!(labels, "solid_Ha", [solid_Ha])
-      push!(solid_entities, solid_Ha)
-    end
-    if !isnothing(solid_s)
-      add_tag!(labels, "solid_s", [solid_s])
-      push!(solid_entities, solid_s)
-    end
-    add_tag!(labels, "solid", solid_entities)
-    add_tag!(labels, "fluid", [fluid])
-    Meshers.add_non_slip_at_solid_entity!(model, solid_entities, fluid, noslip)
-    add_tag!(labels, "fluid-solid-boundary", [noslip])
-  else
-    # If both walls are missing, "fluid-solid-boundary" tag is created empty
-    # The actual fluid-solid boundary is tagged w/ wall_BC()
-    add_tag_from_tags!(labels, "fluid-solid-boundary", Vector{Int}())
-  end
-
-  return nothing
-end
-
-"""
-  wall_BC(cw_Ha::Real, cw_s::Real, tw_Ha::Real, tw_s::Real)
-
-Selects the insulating BC or thin wall BC for both Ha and Side walls according
-to cw and tw.
-
-Also selects the tags for the no-slip velocity BC which do not lie in a
-fluid-solid boundary, i.e., when tw=0.0 in that side.
-"""
-function wall_BC(
-  model::GridapDistributed.DistributedDiscreteModel,
-  cw_Ha::Real,
-  cw_s::Real,
-  tw_Ha::Real,
-  tw_s::Real,
-  τ_Ha::Real,
-  τ_s::Real
-)
-  function _wall_BC!(cw::Real, tw::Real, τ::Real, tag::String)
-    if (cw > 0.0) && (tw == 0.0)
-      push!(
-        thinWall_options, Dict(
-          :cw => cw,
-          :τ => τ,
-          :domain =>Boundary(model, tags=tag)
-        )
-      )
-    else
-      push!(insulated_tags, tag)
-    end
-
-    if tw == 0.0
-      # add_non_slip_at_solid_entity! does not detect this tag as a fluid-solid
-      # boundary, so it must be manually added to the no-slip BC tag list
-      push!(noslip_extra_tags, tag)
-    end
-
-    return nothing
-  end
-
-  insulated_tags = Vector{String}()
-  thinWall_options = Vector{Dict{Symbol,Any}}()
-  noslip_extra_tags = Vector{String}()
-
-  _wall_BC!(cw_Ha, tw_Ha, τ_Ha, "Ha_ext_walls")
-  _wall_BC!(cw_s, tw_s, τ_s, "side_ext_walls")
-
-  return insulated_tags, thinWall_options, noslip_extra_tags
-end
-
-# Mesher maps and other helper funcs
-"""
-  mesh_map(Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, fluid_stretching, fluid_stretch_params)
-
-Function that returns a map function to pass to `CartesianDiscreteModel` defining
-the mesh stretching to accomodate more nodes towards the boundary layers, and to
-define a uniform mesh on the solid region.  The returned function depends only of
-one argument (the coordinates) as expected by `CartesianDiscreteModel`.
-
-# Arguments
-- `b`: half-width in the direction perpendicular to the external magnetic field.
-- `tw_Ha`: width of the solid wall in the external magnetic field direction.
-- `tw_s`: width of the solid wall normal to the external magnetic field.
-- `nc`: array containing the total number of cells.
-- `nl`: array containing the number of cells in the fluid region.
-- `ns`: array containing the number of cells in the solid region.
-- `domain`: array describing the computational domain: (x0, xf, y0, yf, z0, zf).
-- `fluid_stretching`: stretching rule.
-- `fluid_stretch_params`: stretching parameters (rule dependent).
-"""
-function mesh_map(
-    Ha,
-    b,
-    tw_Ha,
-    tw_s,
-    nc,
-    nl,
-    ns,
-    domain,
-    fluid_stretching,
-    fluid_stretch_params,
-)
-  function _mesh_map(coord)
-    if (tw_s > 0.0) || (tw_Ha > 0.0)
-      coord = solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
-    end
-
-    if fluid_stretching == :uniform
-    elseif fluid_stretching == :Roberts
-      if γ > 0.0
-        coord = stretchMHD(
-          coord,
-          domain=(0, -b, 0, -1.0),
-          factor=(stretch_γ, stretch_Ha),
-          dirs=(1, 2),
-        )
-        coord = stretchMHD(
-          coord,
-          domain=(0, b, 0, 1.0),
-          factor=(stretch_γ, stretch_Ha),
-          dirs=(1, 2),
-        )
-      else
-        coord = stretchMHD(coord, domain=(0, -1.0), factor=(stretch_Ha,), dirs=(2,))
-        coord = stretchMHD(coord, domain=(0, 1.0), factor=(stretch_Ha,), dirs=(2,))
-      end
-    elseif fluid_stretching == :hyperbolic
-      coord = stretch_map(coord, x_hyp, b, 1)
-      coord = stretchMHD(coord, domain=(0, -1.0), factor=(stretch_Ha,), dirs=(2,))
-      coord = stretchMHD(coord, domain=(0, 1.0), factor=(stretch_Ha,), dirs=(2,))
-    end
-
-    return coord
-  end
-
-  @assert fluid_stretching ∈ (:uniform, :Roberts, :hyperbolic)
-  stretch_Ha = sqrt(Ha/(Ha-1))
-  if fluid_stretching == :Roberts
-    @assert length(fluid_stretch_params) == 2
-    γ, δ = fluid_stretch_params
-    stretch_γ = 1/sqrt(1 - δ/Ha^γ)
-  elseif fluid_stretching == :hyperbolic
-    @assert length(fluid_stretch_params) == 2
-    l_BL, n_δ = fluid_stretch_params
-    δ = 1/sqrt(Ha)
-    x_hyp = map_hyp(b, l_BL, δ, nl[1]; n_δ=n_δ)
-  end
-
-  return _mesh_map
-end
-
-"""
-  solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
-
-Map to space out the mesh nodes evenly in the solid region according to the
-specified number of solid cells, ns, and the solid width, tw.  It also requires
-the total number of cells, nc, the number of cells in the liquid region, nl, and
-the domain.
-
-tw_s and tw_Ha are the side wall and Hartmann wall respective thickness, i.e.,
-they are the solid width in the X and Y directions, respectively.
-
-nc, ns, and nl are assumed to be arrays corresponding to the X and Y directions
-respectevely.
-
-domain is an array specifying the domain limits:
-  domain = (x0, xf, y0, yf,...)
-"""
-function solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
-  ncoord = collect(coord.data)
-  x0 = domain[1]
-  xf = domain[2]
-  y0 = domain[3]
-  yf = domain[4]
-  dx = (xf - x0)/nc[1]
-  dxl = (xf - x0 - 2*tw_s)/nl[1]
-  dxs = tw_s/ns[1]
-  dy = (yf - y0)/nc[2]
-  dyl = (yf - y0 - 2*tw_Ha)/nl[2]
-  dys = tw_Ha/ns[2]
-
-  if tw_s > 0.0
-    nx = abs(ncoord[1] - x0)/dx
-    if nx < ns[1]
-      ncoord[1] = x0 + nx*dxs
-    elseif ns[1] <= nx <= (nl[1] + ns[1])
-      ncoord[1] = x0 + tw_s + (nx - ns[1])*dxl
-    elseif nx > (nl[1] + ns[1])
-      ncoord[1] = x0 + tw_s + nl[1]*dxl + (nx - nl[1] - ns[1])*dxs
-    end
-  end
-  if tw_Ha > 0.0
-    ny = abs(ncoord[2] - y0)/dy
-    if ny < ns[2]
-      ncoord[2] = y0 + ny*dys
-    elseif ns[2] <= ny <= (nl[2] + ns[2])
-      ncoord[2] = y0 + tw_Ha + (ny - ns[2])*dyl
-    elseif ny > (nl[2] + ns[2])
-      ncoord[2] = y0 + tw_Ha + nl[2]*dyl + (ny - nl[2] - ns[2])*dys
-    end
-  end
-  return VectorValue(ncoord)
-end
-
-"""
-  map_hyp(xf, l_BL, δ, nl; n_δ=2.0)
-
-Hyperbolic element distribution aimed for the liquid region.
-
-The aim is to distribute the mesh elements so that their separation follows a tanh rule
-with a minimum near the fluid-solid boundary (given by `xf`).  `l_BL` determines the initial
-element separation; `δ` determines where the inflection point lies; `nl` gives the number of
-elements; and the keyword argument `n_δ` can modify the slope of the separation distribution.
-"""
-function map_hyp(xf::Real, l_BL::Real, δ::Real, nl::Real; n_δ=2.0)
-  function _l(x)
-    cell_length = (l_core - l_BL)/2*(1 - tanh((x - xf + n_δ*δ)/δ)) + l_BL
-
-    return cell_length
-  end
-
-  n = ceil(Int, nl/2)
-  l_core = 2*(xf - n*l_BL)/n + l_BL  # Initial guess
-
-  xnew = Vector{Float64}(undef, n)
-  xnew[end] = xf
-  for i in 1:(n - 1)
-    xnew[end - i] = xnew[end - i + 1] - _l(xnew[end - i + 1])
-  end
-
-  l_core_final = (xnew[2] - xnew[1])/(xf - xnew[1])  # Final guess
-  if iseven(nl)
-    # Renormalize so that xnew[1] = l_core
-    Δx₀ = l_core_final
-  else
-    # Renormalize so that xnew[1] = l_core/2
-    Δx₀ = l_core_final/2
-  end
-  xnew = ((xnew .- xnew[1])./(xf - xnew[1]) .+ Δx₀)./(xf + Δx₀)
-
-  return xnew
-end
-
-"""
-  stretch_map(coord, xnew, xf, dir)
-
-Stretch the mesh symmetrically following the distribution given by `xnew` in the region
-`(-xf, xf)` along the `dir` direction.  `xnew` is assumed to give the `(0, xf)`
-distribution.
-"""
-function stretch_map(coord, xnew, xf::Real, dir::Integer)
-  n = length(xnew)
-  ncoord = collect(coord.data)
-  if 0.0 < coord[dir] <= xf
-    ncoord[dir] = xnew[round(Int, coord[dir]*n/xf)]
-  elseif -xf <= coord[dir] < 0.0
-    ncoord[dir] = -xnew[round(Int, abs(coord[dir])*n/xf)]
-  end
-
-  return VectorValue(ncoord)
-end
-
-"""
-  stretchMHD(coord; domain, factor, dirs)
-
-Particular case of a mesh stretching rule described in "G.O. Roberts, Computational meshes
-for boundary layer problems, _Proceedings of the Second International Conference on
-Numerical Methods Fluid Dynamics, Lecture Notes on Physics, vol. 8, Springer-Verlag, New
-York, 1971, pp. 171–177."
-
-# Arguments
-- `coord`: coordinate set describing the mesh to stretch.
-- `domain`: domain over which the stretching is computed.
-- `dirs`: directions over which the stretching is computed.
-"""
-function stretchMHD(
-  coord;
-  domain=(0.0, 1.0, 0.0, 1.0, 0.0, 1.0),
-  factor=(1.0, 1.0, 1.0),
-  dirs=(1, 2, 3),
-)
-  ncoord = collect(coord.data)
-  for (i,dir) in enumerate(dirs)
-    ξ0 = domain[i*2-1]
-    ξ1 = domain[i*2]
-    l =  ξ1 - ξ0
-    c = (factor[i] + 1)/(factor[i] - 1)
-
-    if l > 0
-      if ξ0 <= coord[dir] <= ξ1
-        ξx = (coord[dir] - ξ0)/l                     # ξx from 0 to 1 uniformly distributed
-        ξx_streched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx streched from 0 to 1 towards 1
-        ncoord[dir] =  ξx_streched*l + ξ0            # coords streched towards ξ1
-      end
-    else
-      if ξ1 <= coord[dir] <= ξ0
-        ξx = (coord[dir] - ξ0)/l                     # ξx from 0 to 1 uniformly distributed
-        ξx_streched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx streched from 0 to 1 towards 1
-        ncoord[dir] =  ξx_streched*l + ξ0            # coords streched towards ξ1
-      end
-    end
-  end
-  return VectorValue(ncoord)
-end
-
 """
   isfluid(b)
 
@@ -891,34 +492,6 @@ function isfluid(b)
 
   return _isfluid
 end
-
-# Magnetic field curl free correction
-"""
-  curl_free_B(B)
-
-Given `B`, a 1D magnetic field fit, it returns a function with a curl free correction
-for a magnetic field consistent with real fields [1].
-
-[1]: X. Albets-Chico et al. (2011), Fusion Eng. Des. 86(1), 5-14.
-"""
-function curl_free_B(B)
-  dB(x) = ForwardDiff.derivative(B, x)
-  d²B(x) = ForwardDiff.derivative(dB, x)
-  d³B(x) = ForwardDiff.derivative(d²B, x)
-  d⁴B(x) = ForwardDiff.derivative(d³B, x)
-
-  function _curl_free_B(x)
-    B₁ = 0.0
-    B₂ = B(x[3]) - d²B(x[3])*x[2]^2/2 + d⁴B(x[3])*x[2]^4/24
-    B₃ = dB(x[3])*x[2] - d³B(x[3])*x[2]^3/6
-
-    return VectorValue(B₁, B₂, B₃)
-  end
-
-  return _curl_free_B
-end
-
-
 
 # Post-processing and analytical solutions
 """

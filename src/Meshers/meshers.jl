@@ -19,5 +19,10 @@ module Meshers
   include("hunt_mesher.jl")
   
   export hunt_generate_base_mesh
+  export stretchMHD
+
+  include("solid_mesher.jl")
+
+  export solid_mesh_map, solid_add_tags!, solid_wall_BC
   
 end

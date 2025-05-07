@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Cache p4est
         id: cache-p4est
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
          path: ${{env.P4EST_ROOT_DIR}}
          key: ${{ runner.os }}-build-${{ env.P4EST_ROOT_DIR }}-
@@ -76,6 +76,7 @@ jobs:
           cd $SOURCES_DIR
           ./configure --prefix=$PETSC_INSTALL --with-cc=mpicc --with-cxx=mpicxx --with-fc=mpif90 \
              --download-mumps --download-scalapack --download-parmetis --download-metis \
+             --download-fblaslapack \
              --download-ptscotch --with-debugging --with-x=0 --with-shared=1 \
              --with-mpi=1 --with-64-bit-indices
           make

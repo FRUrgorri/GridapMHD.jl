@@ -1,8 +1,25 @@
+"""
+  stretchMHD(coord; domain, factor, dirs)
 
+Particular case of a mesh stretching rule reproduced in [1] from the original source [2].
+
+# Arguments
+- `coord`: coordinate set describing the mesh to stretch.
+- `domain`: domain over which the stretching is computed.
+- `dirs`: directions over which the stretching is computed.
+
+[1]: S. Smolentsev et al., "Code development for analysis of MHD pressure drop reduction
+in a liquid metal blanket using insulation technique based on a fully developed flow
+model", Fusion Engineering and Design 73 (2005) 83-93.
+
+[2]: G.O. Roberts, "Computational meshes for boundary layer problems", Proceedings of the
+Second International Conference on Numerical Methods Fluid Dynamics, Lecture Notes on
+Physics, vol. 8, Springer-Verlag, New York, 1971, pp. 171–177.
 """
-  Mesh streching according to Smolentsev formula
-"""
-function strechMHD(coord;domain=(0.0,1.0,0.0,1.0,0.0,1.0),factor=(1.0,1.0,1.0),dirs=(1,2,3))
+function stretchMHD(
+  coord;
+  domain=(0.0,1.0,0.0,1.0,0.0,1.0),factor=(1.0,1.0,1.0),dirs=(1,2,3)
+)
   ncoord = collect(coord.data)
   for (i,dir) in enumerate(dirs)
     ξ0 = domain[i*2-1]
@@ -13,14 +30,14 @@ function strechMHD(coord;domain=(0.0,1.0,0.0,1.0,0.0,1.0),factor=(1.0,1.0,1.0),d
     if l > 0
       if ξ0 <= coord[dir] <= ξ1
         ξx = (coord[dir] - ξ0)/l                     # ξx from 0 to 1 uniformly distributed
-        ξx_streched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx streched from 0 to 1 towards 1
-        ncoord[dir] =  ξx_streched*l + ξ0            # coords streched towards ξ1
+        ξx_stretched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx stretched from 0 to 1 towards 1
+        ncoord[dir] =  ξx_stretched*l + ξ0            # coords stretched towards ξ1
       end
     else
       if ξ1 <= coord[dir] <= ξ0
         ξx = (coord[dir] - ξ0)/l                     # ξx from 0 to 1 uniformly distributed
-        ξx_streched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx streched from 0 to 1 towards 1
-        ncoord[dir] =  ξx_streched*l + ξ0            # coords streched towards ξ1
+        ξx_stretched = factor[i]*(c^ξx-1)/(1+c^ξx)    # ξx stretched from 0 to 1 towards 1
+        ncoord[dir] =  ξx_stretched*l + ξ0            # coords stretched towards ξ1
       end
     end
   end
@@ -30,11 +47,11 @@ end
 function hunt_stretch_map(
   L::Real,Ha::Real,kmap_x::Number,kmap_y::Number,BL_adapted::Bool
 )
-  strech_Ha = sqrt(Ha/(Ha-1))
-  strech_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
+  stretch_Ha = sqrt(Ha/(Ha-1))
+  stretch_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
   function map1(x)
-    y = strechMHD(x,domain=(0,-L,0,-L),factor=(strech_side,strech_Ha),dirs=(1,2))
-    z = strechMHD(y,domain=(0,L,0,L),factor=(strech_side,strech_Ha),dirs=(1,2))
+    y = stretchMHD(x,domain=(0,-L,0,-L),factor=(stretch_side,stretch_Ha),dirs=(1,2))
+    z = stretchMHD(y,domain=(0,L,0,L),factor=(stretch_side,stretch_Ha),dirs=(1,2))
     return z  
   end
   function map2(x)

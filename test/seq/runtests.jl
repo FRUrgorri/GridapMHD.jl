@@ -10,4 +10,6 @@ using Test
 
 @time @testset "Transient" begin include("transient_tests.jl") end
 
+@time @testset "Solid" begin include("solid_tests.jl") end
+
 end # module
