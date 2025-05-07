@@ -224,26 +224,13 @@ function _Solid(;
     if B_var == :uniform
       Bfield = dirB
     elseif B_var == :polynomial
-      # B_coef assumed to be normalized w.r.t. given Ha
-      Bfunc = x -> sum(B_coef .* [x^(i-1) for i in 1:length(B_coef)])
+      Bfunc = B_polynomial(α...)
     elseif B_var == :tanh
-      Bfunc = function (x)
-        (x₀, α, β, γ) = B_coef
-        return (1 + α*tanh(γ*(β - abs(x - x₀))))/(1 + α*tanh(γ*β))
-      end
+      Bfunc = B_tanh(B_coef...)
     elseif B_var == :tanhMaPLE
-      # x₀ = B_coef[1] is where the field maximum is.
-      # α = B_coef[2] is how far from x₀ the function takes half its value.
-      # β = B_coef[3] determines how flat the plateau is.
-      Bfunc = function (x)
-        (x₀, α, β) = B_coef
-        return (0.5*(1 - tanh((abs(x - x₀) - α)/β)))
-      end
+      Bfunc = B_tanh_MaPLE(B_coef...)
     elseif B_var == :arctan
-      Bfunc = function (x)
-        (x₀, α, β, γ) = B_coef
-        return (1 + α*atan(γ*(β - abs(x - x₀))))/(1 + α*atan(γ*β))
-      end
+      Bfunc = B_arctan(B_coef...)
     else
       error("Unrecognized magnetic field input.")
     end
@@ -520,32 +507,6 @@ function isfluid(b)
   end
 
   return _isfluid
-end
-
-# Magnetic field curl free correction
-"""
-  curl_free_B(B)
-
-Given `B`, a 1D magnetic field fit, it returns a function with a curl free correction
-for a magnetic field consistent with real fields [1].
-
-[1]: X. Albets-Chico et al. (2011), Fusion Eng. Des. 86(1), 5-14.
-"""
-function curl_free_B(B)
-  dB(x) = ForwardDiff.derivative(B, x)
-  d²B(x) = ForwardDiff.derivative(dB, x)
-  d³B(x) = ForwardDiff.derivative(d²B, x)
-  d⁴B(x) = ForwardDiff.derivative(d³B, x)
-
-  function _curl_free_B(x)
-    B₁ = 0.0
-    B₂ = B(x[3]) - d²B(x[3])*x[2]^2/2 + d⁴B(x[3])*x[2]^4/24
-    B₃ = dB(x[3])*x[2] - d³B(x[3])*x[2]^3/6
-
-    return VectorValue(B₁, B₂, B₃)
-  end
-
-  return _curl_free_B
 end
 
 

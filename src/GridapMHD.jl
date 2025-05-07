@@ -38,6 +38,7 @@ include("Solvers/li2019.jl")
 # Main driver
 include("Fixes.jl")
 include("ExtraFunctions.jl")
+include("MagneticFields.jl")
 include("parameters.jl")
 include("weakforms.jl")
 include("Main.jl")
