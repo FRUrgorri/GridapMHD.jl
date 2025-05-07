@@ -148,7 +148,10 @@ function _Solid(;
   # direction
   nc = nl .+ (2 .* ns)
 
-  dirB = (1/norm(VectorValue(dir_B)))*VectorValue(dir_B)
+  if !isa(dirB, VectorValue)
+    dirB = VectorValue(dirB)
+  end
+  dirB = (1/norm(dir_B))*dir_B
 
   info = Dict{Symbol,Any}()
   params = Dict{Symbol,Any}(
@@ -207,7 +210,7 @@ function _Solid(;
       if curl_free
         Bfield = curl_free_B(B_func)
       else
-        Bfield = x -> VectorValue(dirB)*B_func(x[3])
+        Bfield = x -> dirB*B_func(x[3])
       end
     else
       error("Unrecognized magnetic field input.")
