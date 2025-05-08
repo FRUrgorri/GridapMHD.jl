@@ -354,10 +354,23 @@ function _Solid(;
     cellfields, uh_0, kp = postprocess_3D(xh, model, Ω, b)
   end
 
-  if cw_s == 0.0 && cw_Ha == 0.0
-    kp_a = kp_shercliff_cartesian(b, Ha)
+  if B_func == :uniform
+    if cw_s == 0.0 && cw_Ha == 0.0
+      kp_a = kp_shercliff_cartesian(b, Ha)
+    else
+      kp_a = kp_tillac(b, Ha, cw_s, cw_Ha)
+    end
   else
-    kp_a = kp_tillac(b, Ha, cw_s, cw_Ha)
+    # Actually these are numerical and Miyazaki's pressure drops, not kp
+    kp = (
+      surf_avg(model, xh[2], "outlet"; restrict=isfluid(b)) -
+      surf_avg(model, xh[2], "inlet"; restrict=isfluid(b))
+    )
+    if abs(cw_Ha - cw_s)/cw_Ha < 1e-3
+      kp_a = kp_Miyazaki_rectangular(cw_Ha)*quad(B_func, 0, L; n=500)
+    else
+      kp_a = kp_tillac(b, Ha, cw_s, cw_Ha)*quad(B_func, 0, L; n=500)
+    end
   end
   dev_kp = 100*abs(kp_a - kp)/max(kp_a, kp)
 
@@ -542,7 +555,8 @@ end
   postprocess_3D(xh, model, Ω, b)
 
 Post process operations and computations to be run after a 3D solution `xh` is
-obtained.  `Ω` is the `model`'s interior.
+obtained, `Ω` is the `model`'s interior, and `b` the half-width in the direction
+perpendicular to the external magnetic field.
 """
 function postprocess_3D(xh, model, Ω, b)
   uh, ph, jh, φh = xh
@@ -558,8 +572,6 @@ function postprocess_3D(xh, model, Ω, b)
   Γ = Boundary(model, tags="outlet")
   dΓ = Measure(Γ, 6)
   kp = sum(∫(-Grad_p*_isfluid)*dΓ)[3]/sum(∫(_isfluid)*dΓ)
-  kp_a = nothing
-  dev_kp = nothing
 
   cellfields=[
     "uh"=>uh,
@@ -571,5 +583,5 @@ function postprocess_3D(xh, model, Ω, b)
     "grad_p"=>Grad_p,
   ]
 
-  return cellfields, uh_0, kp, kp_a, dev_kp
+  return cellfields, uh_0, kp
 end
