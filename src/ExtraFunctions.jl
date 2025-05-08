@@ -112,7 +112,7 @@ function analytical_GeneralHunt_u(
   # General Hunt analytical formula (d_b = 0 for Shercliff)
   l::Real,          # channel aspect ratio
   d_b::Real,        # Hartmann walls conductivity ratio
-  grad_pz::Real,    # Dimensionless (MHD version) presure gradient
+  grad_p::Real,    # Dimensionless (MHD version) presure gradient
   Ha::Real,         # Hartmann number
   n::Int,           # number of sumands included in Fourier series
   x)                # evaluation point normaliced by the Hartmann characteristic lenght
@@ -130,15 +130,24 @@ function analytical_GeneralHunt_u(
     eplus_2k = 1 + exp(-2*r2_k)
     eminus_2k = 1 - exp(-2*r2_k)
     eplus_k = 1 + exp(-2*(r1_k+r2_k))
-    e_x_1k = 0.5*(exp(-r1_k*(1-x[2]))+exp(-r1_k*(1+x[2])))
-    e_x_2k = 0.5*(exp(-r2_k*(1-x[2]))+exp(-r2_k*(1+x[2])))
+    e_x_1k = x -> 0.5*(exp(-r1_k*(1-x[2]))+exp(-r1_k*(1+x[2])))
+    e_x_2k = x -> 0.5*(exp(-r2_k*(1-x[2]))+exp(-r2_k*(1+x[2])))
 
-    V2 = ((d_b*r2_k + eminus_2k/eplus_2k)*e_x_1k)/(0.5*N*d_b*eplus_1k + eplus_k/eplus_2k)
-    V3 = ((d_b*r1_k + eminus_1k/eplus_1k)*e_x_2k)/(0.5*N*d_b*eplus_2k + eplus_k/eplus_1k)
+    V2 =  x -> ((d_b*r2_k + eminus_2k/eplus_2k)*e_x_1k(x))/(0.5*N*d_b*eplus_1k + eplus_k/eplus_2k)
+    V3 =  x -> ((d_b*r1_k + eminus_1k/eplus_1k)*e_x_2k)/(0.5*N*d_b*eplus_2k + eplus_k/eplus_1k)
 
     V += 2*(-1)^k*cos(α_k * x[1])/(l*α_k^3) * (1-V2-V3)
   end
-  u_z = V*Ha^2*(-grad_pz)
+  _u = V*Ha^2*(-grad_p)
 
-  VectorValue(0.0*u_z, 0.0*u_z, u_z)
+  return _u
 end
+
+function u_parabolic(b)
+
+   _u(x,y) = (9/(4*b^3))*(x^2 - b^2)*(y^2 - 1)
+
+   return _u
+
+end
+

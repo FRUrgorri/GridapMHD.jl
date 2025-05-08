@@ -116,8 +116,7 @@ function _Solid(;
   Re = 1.0,
   N = nothing,
   convection = true,
-  B_func = :uniform,
-  dir_B = (0.0,1.0,0.0),
+  Bfield = VectorValue(0.0,1.0,0.0),  #This is B/B_0 where B_0 is the one used to define Ha, it is in general a function of x,y,z
   curl_free = false,
   b = 1.0,
   L = nothing,
@@ -125,7 +124,7 @@ function _Solid(;
   tw_s = 0.0,
   cw_Ha = 0.0,
   cw_s = 0.0,
-  inlet = nothing,
+  u_inlet = VectorValue(0.0,0.0,1.0), #This is U/U_0 where U_0 is the one used to define Re, it is in general a function of x,y,z
   vtk = true,
   solve = true,
   solver = :julia,
@@ -147,12 +146,7 @@ function _Solid(;
   # 2*ns accounts for ns solid cells on each side of the liquid for each
   # direction
   nc = nl .+ (2 .* ns)
-
-  if !isa(dir_B, VectorValue)
-    dir_B = VectorValue(dir_B)
-  end
-  dir_B = (1/norm(dir_B))*dir_B
-
+  
   info = Dict{Symbol,Any}()
   params = Dict{Symbol,Any}(
     :solve=>solve,
@@ -172,11 +166,11 @@ function _Solid(;
   # Check for FD approx. (2D) or full 3D simulation
   FD = (
     (length(nc) == 2) && (length(rank_partition) == 2) && isa(L, Nothing) &&
-    isa(inlet, Nothing) && (Re == 1.0) && isa(N, Nothing)
+    (Re == 1.0) && isa(N, Nothing)
   )
   Full3D = (
     (length(nc) == 3) && (length(rank_partition) == 3) && isa(L, Number) &&
-    !isa(inlet, Nothing) && isa(Re, Nothing) && isa(N, Number)
+    isa(Re, Nothing) && isa(N, Number)
   )
   if FD
     _nc = (nc[1],nc[2],3)
@@ -185,7 +179,6 @@ function _Solid(;
     N = Ha^2/Re
     f = VectorValue(0.0, 0.0, 1.0)
     periodic = (false, false, true)
-    Bfield = dir_B
   elseif Full3D
     _nc = nc
     _rank_partition = rank_partition
@@ -195,40 +188,6 @@ function _Solid(;
     if ns[3] > 0
       error("No solid elements allowed at inlet/outlet regions.")
     end
-
-    # Inlet BC
-    if inlet == :parabolic
-      u_inlet((x,y,z)) = VectorValue(0, 0, (9/(4*b^3))*(x^2 - b^2)*(y^2 - 1))
-    elseif inlet == :uniform
-      u_inlet = VectorValue(0.0, 0.0, 1.0)
-    end
-
-    # External magnetic field
-    if B_func == :uniform
-      Bfield = dir_B
-    elseif isa(B_func, Function)
-      if curl_free
-        Bfield = curl_free_B(B_func)
-      else
-        Bfield = x -> dir_B*B_func(x[3])
-      end
-    else
-      error("Unrecognized magnetic field input.")
-    end
-
-    if B_func != :uniform
-      if curl_free
-        Bfield = curl_free_B(Bfunc)
-      else
-        Bfield = x -> VectorValue(0.0, Bfunc(x[3]), 0.0)
-      end
-    end
-
-  else
-    error(
-      "Input args are not compatible with either a 3D computation or a \
-      fully developed approximation."
-    )
   end
 
   # Timer
@@ -346,7 +305,6 @@ function _Solid(;
   tic!(t,barrier=true)
 
   # Post process
-  θⱼ = acosd(dir_B·VectorValue(0.0, 1.0, 0.0))
 
   if FD
     cellfields, uh_0, kp = postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
@@ -365,9 +323,9 @@ function _Solid(;
     if (tw_Ha > 0.0) && (tw_s > 0.0)
       push!(cellfields, "σ"=>σ_Ω)
     end
-    if B_func != :uniform
+#    if B_func != :uniform
       push!(cellfields, "B"=>CellField(Bfield, Ω))
-    end
+#    end
     writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
     toc!(t,"vtk")
   end
@@ -398,13 +356,6 @@ function _Solid(;
   info[:kp_a] = kp_a
   info[:dev_kp] = dev_kp
   info[:convection] = convection
-  info[:inlet] = inlet
-  if isa(B_func, Symbol)
-    info[:B_func] = B_func
-  else
-    info[:B_func] = "Custom function"
-  end
-  info[:theta_y] = θⱼ
   info[:μ] = μ
 
   return info, t
