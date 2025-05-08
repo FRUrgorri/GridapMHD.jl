@@ -212,12 +212,15 @@ function solid_add_tags!(
 end 
     
 function solid_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
+  # Vertex tags: [1:8]
+  # Edge tags: [9:20]
+  # Surf tags: [21:26]
   labels = get_face_labeling(model)
-  tags_inlet = append!(collect(1:20),[21])
-  tags_outlet = append!(collect(1:20),[22])
+  tags_inlet = append!(collect(1:4), [9, 10, 13, 14], [21])
+  tags_outlet = append!(collect(5:8), [11, 12, 15, 16], [22])
   # These are the external walls, i.e., not necesarily the fluid-solid boundary
-  tags_j_Ha = append!(collect(1:20), [23,24])
-  tags_j_side = append!(collect(1:20), [25,26])
+  tags_j_Ha = append!(collect(1:8), [9, 11, 17, 18], [10, 12, 19, 20], [23, 24])
+  tags_j_side = append!(collect(1:8), [13, 15, 17, 19], [14, 16, 18, 20], [25, 26])
   add_tag_from_tags!(labels, "inlet", tags_inlet)
   add_tag_from_tags!(labels, "outlet", tags_outlet)
   add_tag_from_tags!(labels, "Ha_ext_walls", tags_j_Ha)
