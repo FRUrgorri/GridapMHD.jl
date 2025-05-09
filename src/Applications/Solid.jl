@@ -216,14 +216,6 @@ function _Solid(;
       error("Unrecognized magnetic field input.")
     end
 
-    if B_func != :uniform
-      if curl_free
-        Bfield = curl_free_B(Bfunc)
-      else
-        Bfield = x -> VectorValue(0.0, Bfunc(x[3]), 0.0)
-      end
-    end
-
   else
     error(
       "Input args are not compatible with either a 3D computation or a \
