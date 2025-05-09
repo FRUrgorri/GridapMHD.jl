@@ -353,15 +353,15 @@ function _Solid(;
       kp_a = kp_tillac(b, Ha, cw_s, cw_Ha)
     end
   else
-    # Actually these are numerical and Miyazaki's pressure drops, not kp
-    kp = (
+    # Actually these are numerical and Miyazaki's pressure drops per unit length, not kp
+    kp = (-1)*(
       surf_avg(model, xh[2], "outlet"; restrict=isfluid(b)) -
       surf_avg(model, xh[2], "inlet"; restrict=isfluid(b))
-    )
+    )/L
     if abs(cw_Ha - cw_s)/cw_Ha < 1e-3
-      kp_a = kp_Miyazaki_rectangular(cw_Ha)*quad(B_func, 0, L; n=500)
+      kp_a = kp_Miyazaki_rectangular(cw_Ha, b)*quad(x->B_func(x)^2, 0.0, L; n=500)/L
     else
-      kp_a = kp_tillac(b, Ha, cw_s, cw_Ha)*quad(B_func, 0, L; n=500)
+      kp_a = kp_tillac(b, Ha, cw_s, cw_Ha)*quad(x->B_func(x)^2, 0.0, L; n=500)/L
     end
   end
   dev_kp = 100*abs(kp_a - kp)/max(kp_a, kp)
