@@ -173,9 +173,9 @@ end
 
 Simple quadrature of `f(x)` between `x₀` and `x₁` using `n` divisions.
 """
-function quad(f, x₀, x₁; n=100, dir=1)
+function quad(f, x₀, x₁; n=100)
   Δx = (x₁ - x₀)/n
-  q = sum(f.(x₀ .+ collect(1:n) .* Δx) .* Δx)
+  q = sum(map(f, x₀ .+ collect(1:n) .* Δx).*Δx)
 
   return q
 end
