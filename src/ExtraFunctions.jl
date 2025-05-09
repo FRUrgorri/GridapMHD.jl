@@ -97,7 +97,7 @@ kp_Miyazaki_circular(cw) = cw/(cw + 1)
 
 kp_Miyazaki_rectangular(cw, a, b) = cw/(1 + a/(3*b) + cw)
 
-kp_Miyazaki_rectangular(cw, b) = kp_Miyazaki_rectangular(cw, 1, b)
+kp_Miyazaki_rectangular(cw, b) = kp_Miyazaki_rectangular(cw, 1.0, b)
 
 # Other analytical formulas
 
