@@ -358,11 +358,9 @@ function _Solid(;
       surf_avg(model, xh[2], "outlet"; restrict=isfluid(b)) -
       surf_avg(model, xh[2], "inlet"; restrict=isfluid(b))
     )/L
-    if abs(cw_Ha - cw_s)/cw_Ha < 1e-3
-      kp_a = kp_Miyazaki_rectangular(cw_Ha, b)*quad(x->B_func(x)^2, 0.0, L; n=500)/L
-    else
-      kp_a = kp_tillac(b, Ha, cw_s, cw_Ha)*quad(x->B_func(x)^2, 0.0, L; n=500)/L
-    end
+    avg_Bsq = quad(x->B_func(x)^2, 0.0, L; n=500)/L
+    avg_Ha = sqrt(avg_Bsq)*Ha
+    kp_a = kp_tillac(b, avg_Ha, cw_s, cw_Ha)*avg_Bsq
   end
   dev_kp = 100*abs(kp_a - kp)/max(kp_a, kp)
 
