@@ -1,6 +1,6 @@
 module SolidTestsSequential
 
-using GridapMHD: Solid
+using GridapMHD
 using Gridap
 
 # Fully Developed
