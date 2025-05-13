@@ -6,6 +6,7 @@ using SparseArrays
 using SparseMatricesCSR
 using BlockArrays
 using ForwardDiff
+using NLsolve: nlsolve
 
 using FileIO
 using BSON
