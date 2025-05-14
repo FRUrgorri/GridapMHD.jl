@@ -6,7 +6,7 @@ Return an axially varying magnetic field that follows a polynomial function.
 `α` contains the coefficients of the polynomial for increasing order.
 """
 function B_polynomial(α...)
-  _B(x) = sum(α .* [x^(i-1) for i in 1:length(α)]) 
+  _B(x) = sum(α .* [x^(i-1) for i in 1:length(α)])
 
   return _B
 end
@@ -16,7 +16,7 @@ end
 Return an axially varying magnetic field that follows a parametrized `tanh` function.
 """
 function B_tanh(x₀, α, β, γ)
-  _B(x) = (1 + α*tanh(γ*(β - abs(x - x₀))))/(1 + α*tanh(γ*β)) 
+  _B(x) = (1 + α*tanh(γ*(β - abs(x - x₀))))/(1 + α*tanh(γ*β))
 
   return _B
 end
@@ -32,7 +32,7 @@ Arguments:
 * `β`: changes the _flatness_ of the plateau around the maximum value.
 """
 function B_tanh_MaPLE(x₀, α, β)
-  _B(x) = 0.5*(1 - tanh((abs(x - x₀) - α)/β)) 
+  _B(x) = 0.5*(1 - tanh((abs(x - x₀) - α)/β))
 
   return _B
 end
@@ -47,10 +47,11 @@ function B_arctan(x₀, α, β, γ)
 
   return _B
 end
-"""
- B_Moreau
 
-Implicit field defined in R.Moreau et al. (2010) PMC Physics B 3(1):3 
+"""
+  B_Moreau(z₀)
+
+Implicit field defined in R.Moreau et al. (2010) PMC Physics B 3(1):3
 """
 function B_Moreau(z₀)
 

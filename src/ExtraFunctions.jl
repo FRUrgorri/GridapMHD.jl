@@ -186,4 +186,3 @@ function quad(f, x₀, x₁; n=100)
 
   return q
 end
->>>>>>> solid_coupling
