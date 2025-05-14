@@ -100,7 +100,6 @@ kp_Miyazaki_rectangular(cw, a, b) = cw/(1 + a/(3*b) + cw)
 kp_Miyazaki_rectangular(cw, b) = kp_Miyazaki_rectangular(cw, 1.0, b)
 
 # Other analytical formulas
-
 """
   analytical_GeneralHunt_u(l, d_b, grad_pz, Ha, n, x)
 
@@ -136,17 +135,17 @@ function analytical_GeneralHunt_u(
     eplus_2k = 1 + exp(-2*r2_k)
     eminus_2k = 1 - exp(-2*r2_k)
     eplus_k = 1 + exp(-2*(r1_k+r2_k))
-    e_x_1k = x -> 0.5*(exp(-r1_k*(1-x[2]))+exp(-r1_k*(1+x[2])))
-    e_x_2k = x -> 0.5*(exp(-r2_k*(1-x[2]))+exp(-r2_k*(1+x[2])))
+    e_x_1k = 0.5*(exp(-r1_k*(1-x[2]))+exp(-r1_k*(1+x[2])))
+    e_x_2k = 0.5*(exp(-r2_k*(1-x[2]))+exp(-r2_k*(1+x[2])))
 
-    V2 =  x -> ((d_b*r2_k + eminus_2k/eplus_2k)*e_x_1k(x))/(0.5*N*d_b*eplus_1k + eplus_k/eplus_2k)
-    V3 =  x -> ((d_b*r1_k + eminus_1k/eplus_1k)*e_x_2k)/(0.5*N*d_b*eplus_2k + eplus_k/eplus_1k)
+    V2 = ((d_b*r2_k + eminus_2k/eplus_2k)*e_x_1k)/(0.5*N*d_b*eplus_1k + eplus_k/eplus_2k)
+    V3 = ((d_b*r1_k + eminus_1k/eplus_1k)*e_x_2k)/(0.5*N*d_b*eplus_2k + eplus_k/eplus_1k)
 
     V += 2*(-1)^k*cos(α_k * x[1])/(l*α_k^3) * (1-V2-V3)
   end
   _u = V*Ha^2*(-grad_p)
 
-  return _u
+  return VectorValue(0.0, 0.0, _u)
 end
 
 function u_parabolic(b)
