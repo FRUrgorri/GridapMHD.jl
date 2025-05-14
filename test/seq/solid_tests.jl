@@ -29,7 +29,7 @@ Solid(;
 )
 
 # Non uniform field
-Blin_inc = (x, y, z) -> GridapMHD.B_polynomial(0.5, 0.5)(z)
+Blin_inc = x -> VectorValue([0.0, GridapMHD.B_polynomial(0.5, 0.5)(x[3]), 0.0])
 Solid(;
   nl=(10, 10, 5),
   ns=(3, 3, 0),

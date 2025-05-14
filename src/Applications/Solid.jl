@@ -16,7 +16,7 @@ coupling in a rectangular geometry.
 - `Re = 1.0`: Reynolds number.
 - `N = nothing`: interaction parameter.
 - `convection = true`: toggle for the weak form convective term.
-- `Bfield = (x,y,z) -> VectorValue(0.0,1.0,0.0)`: external magnetic field function `B/B₀`
+- `Bfield = (x...) -> VectorValue(0.0, 1.0, 0.0)`: external magnetic field function `B/B₀`
   where `B₀` is assumed to be the one used to define `Ha`. It is a function of `x,y,z`.
 - `b = 1.0`: half-width in the direction perpendicular to the external magnetic field.
 - `L = nothing`: length in the axial direction.
@@ -24,8 +24,9 @@ coupling in a rectangular geometry.
 - `tw_s = 0.0`: width of the solid wall normal to the external magnetic field.
 - `cw_Ha = 0.0`: wall parameter in the external magnetic field direction.
 - `cw_s = 0.0`: wall parameter normal to the external magnetic field.
-- `u_inlet = (x,y,z) -> VectorValue(0.0,0.0,1.0)`: This is `U/U₀` at the inlet (boundary
-  condition), where `U₀` is the one used to define `Re`.  It is in general a function of `x,y`.
+- `u_inlet = (x...) -> VectorValue(0.0, 0.0, 1.0)`: This is `U/U₀` at the inlet (boundary
+  condition), where `U₀` is the one used to define `Re`.
+  It is in general a function of `x,y,z`.
 - `vtk = true`: toggle to save the final results in vtk format.
 - `solve = true`: toggle to run the solver.
 - `solver = :julia`: solver to be used and additional solver parameters.
@@ -111,14 +112,14 @@ function _Solid(;
   Re = 1.0,
   N = nothing,
   convection = true,
-  Bfield = (x,y,z) -> VectorValue(0.0,1.0,0.0),
+  Bfield = x -> VectorValue(0.0, 1.0, 0.0),
   b = 1.0,
   L = nothing,
   tw_Ha = 0.0,
   tw_s = 0.0,
   cw_Ha = 0.0,
   cw_s = 0.0,
-  u_inlet = (x,y,z) -> VectorValue(0.0,0.0,1.0),
+  u_inlet = (x...) -> VectorValue(0.0, 0.0, 1.0),
   vtk = true,
   solve = true,
   solver = :julia,
@@ -318,7 +319,7 @@ function _Solid(;
     surf_avg(model, xh[2], "inlet"; restrict=isfluid(b))
   )/L
   # Avg(B²) assumes axially varying fields
-  avg_Bsq = quad(x->Bfield(0.0, 0.0, x)^2, 0.0, L; n=500)/L
+  avg_Bsq = quad(x->norm(Bfield(VectorValue([0.0, 0.0, x])))^2, 0.0, L; n=500)/L
   avg_Ha = sqrt(avg_Bsq)*Ha
   Δp_Miyazaki = kp_tillac(b, avg_Ha, cw_s, cw_Ha)*avg_Bsq
   dev_Δp = 100*abs(Δp - Δp_Miyazaki)/max(Δp, Δp_Miyazaki)
