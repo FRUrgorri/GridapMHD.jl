@@ -93,6 +93,12 @@ function kp_glukhih(Ha,cw)
 kp
 end
 
+kp_Miyazaki_circular(cw) = cw/(cw + 1)
+
+kp_Miyazaki_rectangular(cw, a, b) = cw/(1 + a/(3*b) + cw)
+
+kp_Miyazaki_rectangular(cw, b) = kp_Miyazaki_rectangular(cw, 1.0, b)
+
 # Other analytical formulas
 
 """
@@ -144,10 +150,40 @@ function analytical_GeneralHunt_u(
 end
 
 function u_parabolic(b)
-
    _u(x,y) = (9/(4*b^3))*(x^2 - b^2)*(y^2 - 1)
 
    return _u
 
 end
 
+"""
+  surf_avg(model, mag, surf; restrict=x->1.0, degree=6)
+
+Compute the average of `mag` over some surface `surf` defined as a tag on `model`.
+`degree` sets the degree of the quadrature rule. `restrict` is function that multiplies
+`mag` and the area integral. It can be used, e.g., to restrict the average to a certain
+subdomain.
+
+  `surf_avg = ∫(restrict*mag)d(model,surf) / ∫(restrict)d(model,surf)`.
+"""
+function surf_avg(model, mag, surf; restrict=x->1.0, degree=6)
+  Γ = Boundary(model, tags=surf)
+  dΓ = Measure(Γ, degree)
+  mag_avg = sum(∫(restrict*mag)*dΓ)/sum(∫(restrict)*dΓ)
+
+  return mag_avg
+end
+
+
+"""
+  quad(f, x₀, x₁; n=100)
+
+Simple quadrature of `f(x)` between `x₀` and `x₁` using `n` divisions.
+"""
+function quad(f, x₀, x₁; n=100)
+  Δx = (x₁ - x₀)/n
+  q = sum(map(f, x₀ .+ collect(1:n) .* Δx).*Δx)
+
+  return q
+end
+>>>>>>> solid_coupling

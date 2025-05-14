@@ -1,6 +1,6 @@
 module SolidTestsSequential
 
-using GridapMHD: Solid
+using GridapMHD
 using Gridap
 
 # Fully Developed
@@ -27,6 +27,23 @@ Solid(;
   inlet = :uniform,
   mesh2vtk = true,
   solver = :petsc,
+)
+
+# Non uniform field
+Blin_inc = GridapMHD.B_polynomial(0.5, 0.5)
+Solid(;
+  nl=(10,10,5),
+  ns=(3,3,0),
+  Re=nothing,
+  Ha=10.0,
+  N=1.0,
+  L=1.0,
+  inlet=:uniform,
+  tw_Ha=0.1,
+  tw_s=0.1,
+  cw_Ha=0.1,
+  cw_s=0.1,
+  B_func=Blin_inc,
 )
 
 end
