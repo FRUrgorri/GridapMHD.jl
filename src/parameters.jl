@@ -243,11 +243,13 @@ function params_fespaces(params::Dict{Symbol,Any})
     params[:fespaces] = Dict{Symbol,Any}()
   end
   mandatory = Dict(
-   :k => false,
+   :ku => false,
+   :kj => false,
    :p_space => false,
   )
   optional = Dict(
-   :k => 2,
+   :ku => 2,
+   :kj => 1,
    :p_space => :P,
    :p_constraint => nothing,
   )
