@@ -145,7 +145,7 @@ end
 
 function u_parabolic(b)
 
-   _u(x,y) = (9/(4*b^3))*(x^2 - b^2)*(y^2 - 1)
+   _u(x,y) = (9/(4*b^2))*(x^2 - b^2)*(y^2 - 1)
 
    return _u
 
