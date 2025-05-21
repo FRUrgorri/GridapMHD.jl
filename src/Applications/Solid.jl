@@ -133,6 +133,8 @@ function _Solid(;
   fluid_stretching = :Roberts,
   fluid_stretch_params = (0.5, 1.0),
   μ = 0.0,
+  ku = 2,
+  kj = 1,
   τ_Ha = 100.0,
   τ_s = 100.0,
   res_assemble = false,
@@ -152,6 +154,12 @@ function _Solid(;
     :solve=>solve,
     :res_assemble=>res_assemble,
     :jac_assemble=>jac_assemble,
+  )
+
+  #FE order
+  params[:fespaces] = Dict{Symbol, Any}(
+  :ku => ku,
+  :kj => kj,
   )
 
   # Communicator
@@ -324,7 +332,7 @@ function _Solid(;
       push!(cellfields, "σ"=>σ_Ω)
     end
 #    if B_func != :uniform
-      push!(cellfields, "B"=>CellField(Bfield, Ω))
+#      push!(cellfields, "B"=>CellField(Bfield, Ω))
 #    end
     writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
     toc!(t,"vtk")

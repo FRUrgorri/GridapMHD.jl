@@ -201,16 +201,17 @@ _multi_field_style(::Val{:li2019}) = BlockMultiFieldStyle(4,(1,1,1,1),(3,1,2,4))
 # FESpaces
 
 function _fe_spaces(params)
-  k = params[:fespaces][:k]
+  ku = params[:fespaces][:ku]
+  kj = params[:fespaces][:kj]
   T = Float64
   model = params[:model]
 
   # ReferenceFEs
   D = num_cell_dims(model)
-  reffe_u = ReferenceFE(lagrangian,VectorValue{D,T},k)
-  reffe_p = ReferenceFE(lagrangian,T,k-1;space=params[:fespaces][:p_space])
-  reffe_j = ReferenceFE(raviart_thomas,T,k-1)
-  reffe_φ = ReferenceFE(lagrangian,T,k-1)
+  reffe_u = ReferenceFE(lagrangian,VectorValue{D,T},ku)
+  reffe_p = ReferenceFE(lagrangian,T,ku-1;space=params[:fespaces][:p_space])
+  reffe_j = ReferenceFE(raviart_thomas,T,kj)
+  reffe_φ = ReferenceFE(lagrangian,T,kj)
 
   # Test spaces
   mfs = _multi_field_style(params)
@@ -258,7 +259,7 @@ function __fe_operator(T,U,V,params)
 end
 
 function _fe_operator(::ConsecutiveMultiFieldStyle,U,V,params)
-  k = params[:fespaces][:k]
+  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomila degree
   res, jac = weak_form(params,k)
   Tm = params[:solver][:matrix_type]
   Tv = params[:solver][:vector_type]
@@ -268,7 +269,7 @@ end
 
 function _fe_operator(::BlockMultiFieldStyle,U,V,params)
   # TODO: BlockFEOperator, which only updates nonlinear blocks (only important for high Re)
-  k = params[:fespaces][:k]
+  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomila degree
   res, jac = weak_form(params,k)
   Tm = params[:solver][:matrix_type]
   Tv = params[:solver][:vector_type]
@@ -277,7 +278,7 @@ function _fe_operator(::BlockMultiFieldStyle,U,V,params)
 end
 
 function _ode_fe_operator(::ConsecutiveMultiFieldStyle,U,V,params)
-  k = params[:fespaces][:k]
+  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomila degree
   res, jac, jac_t = weak_form(params,k)
   Tm = params[:solver][:matrix_type]
   Tv = params[:solver][:vector_type]
