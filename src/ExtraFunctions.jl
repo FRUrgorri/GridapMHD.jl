@@ -1,30 +1,3 @@
-##Functions for mesh manipulation
-
-function ChangeDensity(coord;domain=(0.0,1.0,0.0,1.0,0.0,1.0),subDomain=(0.0,1.0,0.0,1.0,0.0,1.0),
-			     nodesTot=(1.0,1.0,1.0), nodesSub=(1.0,1.0,1.0), dirs=(1,2,3))
-  ncoord = collect(coord.data)
-  for (i,dir) in enumerate(dirs)
-    ξ0 = domain[i*2-1]
-    ξ1 = domain[i*2]
-    Ltot =  ξ1 - ξ0
-    Lsub = subDomain[i*2] - subDomain[i*2-1]
-
-    alpha = (Lsub/Ltot)*(nodesTot[i]/nodesSub[i])
-    betta = ((Ltot-Lsub)/Ltot)*(nodesTot[i]/(nodesTot[i]-nodesSub[i]))
-
-    if Ltot != Lsub
-      if ξ0 <= coord[dir] <= ξ1
-        if coord[dir] <= (Lsub/alpha + ξ0)
-          ncoord[dir] = alpha*coord[dir] + ξ0*(1-alpha)
-        else
-          ncoord[dir] = betta*coord[dir] + ξ0*(1-betta) + Lsub*(1-betta/alpha)
-        end
-      end
-    end
-  end
-  return VectorValue(ncoord)
-end
-
 ##Functions for geometry generation
 
 function cuboid(;dx=1,dy=1,dz=1,x0=Point(0,0,0),name="cuboid",faces=["face$i" for i in 1:6])

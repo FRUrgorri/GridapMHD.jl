@@ -7,6 +7,9 @@ module Meshers
   using Gridap.Arrays, Gridap.Geometry, Gridap.ReferenceFEs, Gridap.Adaptivity
 
   include("tools.jl")
+  export stretchMHD
+  export ChangeDensity
+  
   include("p4est.jl")
   
   export generate_refined_mesh
@@ -19,7 +22,7 @@ module Meshers
   include("hunt_mesher.jl")
   
   export hunt_generate_base_mesh
-  export stretchMHD
+  
 
   include("solid_mesher.jl")
 
