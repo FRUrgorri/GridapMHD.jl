@@ -1,4 +1,158 @@
 """
+  channel_model(;
+  
+  )
+  Function that returns an anonym function function that generates a Gridap model. Arguments are the geometrical 
+  characteristics and mesh characteristics of a rectangular cross-sectional channel.
+#Arguments
+
+-`Ha` : Hartmann number
+-`b`: channel aspect ratio
+-`L`: channel lenght
+-`nc`: tuple of cells in each direction
+
+"""
+
+function channel_model(
+    Ha = 10,
+    b = 1,
+    L = 2,
+    nc = (4,4,3);
+    )
+    
+    domain = (-b, b, -1.0, 1.0, 0.0, L)
+    
+    stretch_Ha = sqrt(Ha/(Ha-1))
+    strech_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
+    mesh_map = map_cross_section(coord,b, stretch_Ha,strech_side)
+    
+    (parts,rank_partition) -> CartesianDiscreteModel(parts, rank_partition, domain, nc; map=mesh_map)
+end
+
+function channel_model(
+    Ha = 10,
+    b = 1,
+    nc = (4,4,);
+    )
+    
+    domain = (-b, b, -1.0, 1.0, 0.0, 0.1)
+    
+    stretch_Ha = sqrt(Ha/(Ha-1))
+    strech_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
+    mesh_map = map_cross_section(coord,b, stretch_Ha,strech_side)
+    
+    (parts,rank_partition) -> CartesianDiscreteModel(parts, rank_partition, domain, nc; isperiodic=(false,false,true), map=mesh_map)
+end
+
+
+function channel_model(
+    Ha = 10,
+    b = 1,
+    L = 2,
+    tw_Ha = 0,
+    tw_s = 0,
+    cw_Ha = 0.0,
+    cw_s = 0.0, 
+    nl = (4,4),
+    ns = (2,2),
+    nz = 4,
+    fluid_stretching = :Roberts,
+    fluid_stretch_params = (0.5, 1.0)
+)
+"""
+   The total number of mesh elements is the liquid region elements plus
+   ns elements in the direction of the solid domain.
+   2*ns accounts for ns solid cells on each side of the liquid for each
+   direction
+   nL nodes in the flow direction
+""" 
+  nc = ((nl .+ (2 .* ns))...,nz)
+  
+  
+   # Domain definitions
+  domain_liq = (-b, b, -1.0, 1.0, 0.0, L)
+  domain = domain_liq .+ (-tw_s, tw_s, -tw_Ha, tw_Ha, 0.0, 0.0)
+  
+   #Computation of the mesh map 
+  mesh_map = solid_mesh_map(
+    Ha,
+    b,
+    tw_Ha,
+    tw_s,
+    nc,
+    nl,
+    ns,
+    domain,
+    fluid_stretching,
+    fluid_stretch_params,
+  )
+
+   (parts,rank_partition) -> CartesianDiscreteModel(parts, rank_partition, domain, nc; map=mesh_map)
+end
+
+function channel_model(
+    Ha = 10,
+    b = 1,
+    tw_Ha = 0,
+    tw_s = 0,
+    cw_Ha = 0.0,
+    cw_s = 0.0, 
+    nl = (4,4),
+    ns = (2,2),
+    fluid_stretching = :Roberts,
+    fluid_stretch_params = (0.5, 1.0)
+)
+"""
+   The total number of mesh elements is the liquid region elements plus
+   ns elements in the direction of the solid domain.
+   2*ns accounts for ns solid cells on each side of the liquid for each
+   direction
+   nL nodes in the flow direction
+""" 
+  nc = ((nl .+ (2 .* ns))...,3)
+  
+  
+   # Domain definitions
+  domain_liq = (-b, b, -1.0, 1.0, 0.0, 0.1)
+  domain = domain_liq .+ (-tw_s, tw_s, -tw_Ha, tw_Ha, 0.0, 0.0)
+  
+   #Computation of the mesh map 
+  mesh_map = solid_mesh_map(
+    Ha,
+    b,
+    tw_Ha,
+    tw_s,
+    nc,
+    nl,
+    ns,
+    domain,
+    fluid_stretching,
+    fluid_stretch_params,
+  )
+
+   (parts,rank_partition) -> CartesianDiscreteModel(parts, rank_partition, domain, nc; map=mesh_map, isperiodic=(false,false,true))
+end
+
+"""
+    map_cross_section(coord,b,strech_side,strech_Ha)
+    
+Function that applies a cross sectional map using Roberts formula.
+See strechMHD function
+
+# Arguments
+- `coord`: Original coordinates (uniformly distributed)
+- `b` :  Channel aspect ratio
+- `strech_Ha: Streching factor along the direction parallel to B
+- `strech_side: Streching factor along the direction perpendicular to B
+    
+"""
+function map_cross_section(coord,b,strech_Ha,strech_side)
+     ncoord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
+     ncoord = stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
+     ncoord  
+   end
+
+"""
   solid_mesh_map(
     Ha, b, tw_Ha, tw_s, nc, nl, ns, domain, fluid_stretching, fluid_stretch_params
   )
@@ -112,7 +266,7 @@ function solidMap(coord, tw_Ha, tw_s, nc, ns, nl, domain)
 
   if tw_s > 0.0
     nx = abs(ncoord[1] - x0)/dx
-    if nx < ns[1]
+    if nx < ns[1]stretch_Ha
       ncoord[1] = x0 + nx*dxs
     elseif ns[1] <= nx <= (nl[1] + ns[1])
       ncoord[1] = x0 + tw_s + (nx - ns[1])*dxl
