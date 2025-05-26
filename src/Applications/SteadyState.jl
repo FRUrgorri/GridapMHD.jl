@@ -60,8 +60,8 @@ function _SteadyState(;
   insulated_tags = nothing,         #Other kind of BC could be added in future no shear for example
   noslip_tags = ("wall",),          #TBD: Cases with no inlet and outler or multiple inlets and outlets
 #  thinwall_tags = nothing,         #TBD alseo wuith sigma
-  domain_tags = ("fluid",)           
-  normalization = :mhd              # :mhd or :cfd   
+  domain_tags = ("fluid",),           
+  normalization = :mhd,              # :mhd or :cfd   
   Ha = 10.0,
   Re = 1.0,
   N = nothing,
@@ -199,7 +199,7 @@ function _SteadyState(;
 """ 
   #Model from the input  function
   
-
+  @assert !isa(model,Nothing)
   _model = model(parts,rank_partition)
   
   params[:model] = _model
@@ -228,7 +228,7 @@ function _SteadyState(;
   if "solid" ∈ domain_tags              #TBD: This is not allow now
     params[:fluid][:domain] = "fluid"
     params[:solid] = Dict(:domain=>"solid", :σ=>σ) 
-
+  end
     
   
  """ 

@@ -13,11 +13,10 @@
 
 """
 
-function channel_model(
+function channel_model(nc::Tuple{Int64,Int64,Int64};
     Ha = 10,
     b = 1,
-    L = 2,
-    nc = (4,4,3);
+    L = 2 
     )
     
     domain = (-b, b, -1.0, 1.0, 0.0, L)
@@ -29,10 +28,9 @@ function channel_model(
     (parts,rank_partition) -> CartesianDiscreteModel(parts, rank_partition, domain, nc; map=mesh_map)
 end
 
-function channel_model(
+function channel_model(nc::Tuple{Int64,Int64};
     Ha = 10,
-    b = 1,
-    nc = (4,4,);
+    b = 1
     )
     
     domain = (-b, b, -1.0, 1.0, 0.0, 0.1)
@@ -45,7 +43,7 @@ function channel_model(
 end
 
 
-function channel_model(
+function channel_model(nl::Tuple{Int64,Int64},ns::Tuple{Int64,Int64},nz::Int64;
     Ha = 10,
     b = 1,
     L = 2,
@@ -53,9 +51,6 @@ function channel_model(
     tw_s = 0,
     cw_Ha = 0.0,
     cw_s = 0.0, 
-    nl = (4,4),
-    ns = (2,2),
-    nz = 4,
     fluid_stretching = :Roberts,
     fluid_stretch_params = (0.5, 1.0)
 )
@@ -90,15 +85,13 @@ function channel_model(
    (parts,rank_partition) -> CartesianDiscreteModel(parts, rank_partition, domain, nc; map=mesh_map)
 end
 
-function channel_model(
+function channel_model(nl::Tuple{Int64,Int64},ns::Tuple{Int64,Int64};
     Ha = 10,
     b = 1,
     tw_Ha = 0,
     tw_s = 0,
     cw_Ha = 0.0,
     cw_s = 0.0, 
-    nl = (4,4),
-    ns = (2,2),
     fluid_stretching = :Roberts,
     fluid_stretch_params = (0.5, 1.0)
 )
@@ -150,7 +143,7 @@ function map_cross_section(coord,b,strech_Ha,strech_side)
      ncoord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
      ncoord = stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
      ncoord  
-   end
+end
 
 """
   solid_mesh_map(
