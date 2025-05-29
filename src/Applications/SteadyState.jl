@@ -42,7 +42,7 @@ function SteadyState(;
       for (k,v) in data
         info[Symbol("time_$k")] = v.max
       end
-      save(joinpath(path,"$_title.bson"),info)
+      save(joinpath(path,"$title.bson"),info)
     end
   end
 
@@ -78,7 +78,7 @@ function _SteadyState(;
   solver = :julia,
   verbose = true,
   mesh2vtk = false,
-  source = VectorValue(0.0, 0.0, 0.0)
+  source = VectorValue(0.0, 0.0, 0.0),
 #  fluid_stretching = :Roberts,
 #  fluid_stretch_params = (0.5, 1.0),
 #  μ = 0.0,
@@ -198,7 +198,7 @@ function _SteadyState(;
 """ 
   #Model from the input  function
   
-  @assert !isa(model,Nothing)
+  @assert !isa(modelGen,Nothing)
   model = modelGen(parts,rank_partition)
   
   params[:model] = model

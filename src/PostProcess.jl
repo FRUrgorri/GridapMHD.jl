@@ -14,12 +14,12 @@ Most basic postprocess function, it only generates the cell fields and write the
 -`title: title for the output vtk file
 
 """
-function post_process(xh, B::VectorValue{3, Float64}, Ω, path, title)
+function post_process(xh, Ω, B, path, title)
 
   uh, ph, jh, φh = xh
   div_jh = ∇·jh
   div_uh = ∇·uh
-  Grad_p = ∇·ph
+  grad_p = ∇·ph
   
   cellfields=[
     "uh"=>uh,
@@ -28,10 +28,10 @@ function post_process(xh, B::VectorValue{3, Float64}, Ω, path, title)
     "phi"=>φh,
     "div_uh"=>div_uh,
     "div_jh"=>div_jh,
-    "grad_p"=>Grad_p,
-    "B" => CellField(Bfield, Ω)
+    "grad_p"=>grad_p,
+    "B" => CellField(B, Ω)
   ]
   
-   writevtk(Ω, joinpath(path, title), order=max(ku,kj), cellfields=cellfields)
+   writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
    nothing
 end
