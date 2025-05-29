@@ -20,16 +20,16 @@ function SteadyState(;
 #    _title = title*"_r$ir"
     if isa(backend,Nothing)
       @assert isa(np,Nothing)
-      info, t = _SteadyState(;title=title,path=path,kwargs...)
+      info, t, xh, Ω = _SteadyState(;title=title,path=path,kwargs...)
     else
       @assert backend ∈ [:sequential,:mpi]
       @assert !isa(np,Nothing)
       if backend === :sequential
-        info, t = with_debug() do distribute
+        info, t, xh, Ω = with_debug() do distribute
           _SteadyState(;distribute=distribute,rank_partition=np,title=title,path=path,kwargs...)
         end
       else
-        info,t = with_mpi() do distribute
+        info,t, xh, Ω  = with_mpi() do distribute
           _SteadyState(;distribute=distribute,rank_partition=np,title=title,path=path,kwargs...)
         end
       end
@@ -46,7 +46,8 @@ function SteadyState(;
     end
   end
 
-  nothing
+#  nothing
+  return xh, Ω
 end
 
 function _SteadyState(;
@@ -56,11 +57,11 @@ function _SteadyState(;
   rank_partition = nothing,
 #  nl = (4,4),
 #  ns = (2,2),
-  model = nothing,              
-  insulated_tags = nothing,         #Other kind of BC could be added in future no shear for example
-  noslip_tags = ("wall",),          #TBD: Cases with no inlet and outler or multiple inlets and outlets
+  modelGen = nothing,              
+#  insulated_tags = nothing,         #Other kind of BC could be added in future no shear for example
+#  noslip_tags = ("wall",),          #TBD: Cases with no inlet and outler or multiple inlets and outlets
 #  thinwall_tags = nothing,         #TBD alseo wuith sigma
-  domain_tags = ("fluid",),           
+#  domain_tags = ("fluid",),           
   normalization = :mhd,              # :mhd or :cfd   
   Ha = 10.0,
   Re = 1.0,
@@ -75,7 +76,7 @@ function _SteadyState(;
 #  cw_Ha = 0.0,
 #  cw_s = 0.0, 
   u_inlet = VectorValue(0.0,0.0,1.0), #This is U/U_0 where U_0 is the one used to define Re, it is in general a function of x,y,z
-  vtk = true,
+#  vtk = true,
 #  solve = true,
   solver = :julia,
   verbose = true,
@@ -200,10 +201,10 @@ function _SteadyState(;
   #Model from the input  function
   
   @assert !isa(model,Nothing)
-  _model = model(parts,rank_partition)
+  model = modelGen(parts,rank_partition)
   
-  params[:model] = _model
-  Ω = Interior(_model)
+  params[:model] = model
+  Ω = Interior(model)
 
   if mesh2vtk
     meshpath = joinpath(path, title*"_mesh")
@@ -214,7 +215,7 @@ function _SteadyState(;
   
   
   params[:fluid] = Dict{Symbol, Any}(
-    :domain=>nothing, 
+    :domain=>nothing, #For the moment, only fluid
     :α=>α,
     :β=>β,
     :γ=>γ,
@@ -223,14 +224,7 @@ function _SteadyState(;
     :ζ=>0.0,
     :convection=>convection,
   )
-  
-  @assert  "fluid" ∈ domain_tags
-  if "solid" ∈ domain_tags              #TBD: This is not allow now
-    params[:fluid][:domain] = "fluid"
-    params[:solid] = Dict(:domain=>"solid", :σ=>σ) 
-  end
-    
-  
+   
  """ 
   if (tw_s > 0.0) || (tw_Ha > 0.0)
     params[:fluid][:domain] = "fluid"
@@ -249,28 +243,19 @@ function _SteadyState(;
     j_BC = Dict(:tags=>insulated_tags)
 """
 #  elseif Full3D
-    @assert !isa(noslip_tags,Nothing)   #A noslip BC has to be always present
     u_BC = Dict(
-      :tags=>["inlet", noslip_tags...],
+#      :tags=>["inlet", noslip_tags...],
+      :tags=>["inlet", "noslip"],  #What happen if there is no inlet
       :values=>[
         u_inlet,
-        fill(VectorValue(0.0, 0.0, 0.0), length(noslip_tags))...
-      ],
+#       fill(VectorValue(0.0, 0.0, 0.0), length(noslip_tags))...
+        VectorValue(0.0,0.0,0.0)
+      ]
     )
-    
-    if isa(insulated_tags,Nothing)
-        j_BC = Dict(
-           :tags=>["inlet", "outlet"]
-        )
-    else
-        j_BC = Dict(
-           :tags=>[insulated_tags..., "inlet", "outlet"]
-        )
-    end
-    
-#    j_BC = Dict(
+    j_BC = Dict(
 #      :tags=>[insulated_tags..., "inlet", "outlet"],
-#    )
+      :tags=>["insulated","inlet","outlet"],
+    )
 
 #  end
   params[:bcs] = Dict(
@@ -282,7 +267,7 @@ function _SteadyState(;
 """ TBD: Allow a more general stabilization (at least a bit)
   # Stabilization method
   if μ > 0
-    ĥ = b/nl[1]   
+    ĥ = b/nl[1]    See how the cell size is computed in GridapTritium
     params[:bcs][:stabilization] = Dict(:μ=>μ*ĥ, :domain=>"fluid")
   end
 """
@@ -303,7 +288,7 @@ function _SteadyState(;
   t = fullparams[:ptimer]
 
   # Compute quantities
-  tic!(t,barrier=true)
+ # tic!(t,barrier=true)
 
   # Post process
 """
@@ -320,29 +305,34 @@ function _SteadyState(;
   end
   dev_kp = 100*abs(kp_a - kp)/max(kp_a, kp)
 """
+"""
+
   if vtk
-#    if (tw_Ha > 0.0) && (tw_s > 0.0)
-#      push!(cellfields, "σ"=>σ_Ω)
-#    end
-#     if !isa (σ,Nothing)
-#        push!(cellfields, "σ"=>σ)
-#     end if
-#    if B_func != :uniform
-#      push!(cellfields, "B"=>CellField(Bfield, Ω))
-#    end
+    if (tw_Ha > 0.0) && (tw_s > 0.0)
+      push!(cellfields, "σ"=>σ_Ω)
+    end
+     if !isa (σ,Nothing)
+        push!(cellfields, "σ"=>σ)
+     end if
+    if B_func != :uniform
+      push!(cellfields, "B"=>CellField(Bfield, Ω))
+    end
     writevtk(Ω, joinpath(path, title), order=max(ku,kj), cellfields=cellfields)
     toc!(t,"vtk")
   end
+"""
+
+
   if verbose
     display(t)
   end
 
-  cellfields_dict = Dict(cellfields)
+#  cellfields_dict = Dict(cellfields)
 
 
-#La información a info queda un poco desdibujada, se podría irlo comunicando...
+#This info is now much limited
 #  info[:nc] = nc
-  info[:ncells] = num_cells(_model)
+  info[:ncells] = num_cells(model)
   info[:ndofs_u] = length(get_free_dof_values(xh[1]))
   info[:ndofs_p] = length(get_free_dof_values(xh[2]))
   info[:ndofs_j] = length(get_free_dof_values(xh[3]))
@@ -351,8 +341,8 @@ function _SteadyState(;
   info[:Re] = Re
   info[:Ha] = Ha
   info[:N] = N
-  info[:cw] = cw
-#  info[:model] = model #Is this usefull?
+#  info[:cw] = cw
+
 """ 
   info[:cw_s] = cw_s
   info[:cw_Ha] = cw_Ha
@@ -368,6 +358,6 @@ function _SteadyState(;
   info[:convection] = convection
 #  info[:μ] = μ
 
-  return info, t
+  return info, t, xh, Ω 
 end
 

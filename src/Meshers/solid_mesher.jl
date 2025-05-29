@@ -25,7 +25,22 @@ function channel_model(nc::Tuple{Int64,Int64,Int64};
     strech_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
     mesh_map = map_cross_section(coord,b, stretch_Ha,strech_side)
     
-    (parts,rank_partition) -> CartesianDiscreteModel(parts, rank_partition, domain, nc; map=mesh_map)
+    function (parts,rank_partition)  
+    CartesianDiscreteModel(parts, rank_partition, domain, nc; map=mesh_map)
+  # Vertex tags: [1:8]
+  # Edge tags: [9:20]
+  # Surf tags: [21:26]
+    labels = get_face_labeling(model)
+    tags_inlet = append!(collect(1:4), [9, 10, 13, 14], [21])
+    tags_outlet = append!(collect(5:8), [11, 12, 15, 16], [22])
+    tags_walls = append!(collect(1:20), [23, 24, 25, 26])
+    add_tag_from_tags!(labels, "inlet", tags_inlet)
+    add_tag_from_tags!(labels, "outlet", tags_outlet)
+    add_tag_from_tags!(labels, "insulated", tags_insulated)
+    add_tag_from_tags!(labels, "noslip", tags_noslip)
+    
+    nothing
+    end
 end
 
 function channel_model(nc::Tuple{Int64,Int64};
