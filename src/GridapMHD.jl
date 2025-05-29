@@ -43,6 +43,7 @@ include("MagneticFields.jl")
 include("parameters.jl")
 include("weakforms.jl")
 include("Main.jl")
+include("PostProcess.jl")
 
 # Applications
 include("Applications/hunt.jl")
