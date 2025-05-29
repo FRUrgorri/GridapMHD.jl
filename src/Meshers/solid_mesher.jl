@@ -23,7 +23,7 @@ function channel_model(nc::Tuple{Int64,Int64,Int64};
     
     stretch_Ha = sqrt(Ha/(Ha-1))
     strech_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
-    mesh_map = map_cross_section(coord,b, stretch_Ha,strech_side)
+    mesh_map(coord) = map_cross_section(coord,b, stretch_Ha,strech_side)
     
     function (parts,rank_partition)  
     CartesianDiscreteModel(parts, rank_partition, domain, nc; map=mesh_map)
@@ -52,7 +52,7 @@ function channel_model(nc::Tuple{Int64,Int64};
     
     stretch_Ha = sqrt(Ha/(Ha-1))
     strech_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
-    mesh_map = map_cross_section(coord,b, stretch_Ha,strech_side)
+    mesh_map(coord) = map_cross_section(coord,b, stretch_Ha,strech_side)
     
     (parts,rank_partition) -> CartesianDiscreteModel(parts, rank_partition, domain, nc; isperiodic=(false,false,true), map=mesh_map)
 end

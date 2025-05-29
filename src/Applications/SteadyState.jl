@@ -58,9 +58,6 @@ function _SteadyState(;
 #  nl = (4,4),
 #  ns = (2,2),
   modelGen = nothing,              
-#  insulated_tags = nothing,         #Other kind of BC could be added in future no shear for example
-#  noslip_tags = ("wall",),          #TBD: Cases with no inlet and outler or multiple inlets and outlets
-#  thinwall_tags = nothing,         #TBD alseo wuith sigma
 #  domain_tags = ("fluid",),           
   normalization = :mhd,              # :mhd or :cfd   
   Ha = 10.0,
@@ -77,10 +74,11 @@ function _SteadyState(;
 #  cw_s = 0.0, 
   u_inlet = VectorValue(0.0,0.0,1.0), #This is U/U_0 where U_0 is the one used to define Re, it is in general a function of x,y,z
 #  vtk = true,
-#  solve = true,
+  solve = true,
   solver = :julia,
   verbose = true,
   mesh2vtk = false,
+  source = VectorValue(0.0, 0.0, 0.0)
 #  fluid_stretching = :Roberts,
 #  fluid_stretch_params = (0.5, 1.0),
 #  μ = 0.0,
@@ -102,13 +100,13 @@ function _SteadyState(;
   
  
   info = Dict{Symbol,Any}()
-"""
+
   params = Dict{Symbol,Any}(
     :solve=>solve,
-    :res_assemble=>res_assemble,
-    :jac_assemble=>jac_assemble,
+#    :res_assemble=>res_assemble,
+#    :jac_assemble=>jac_assemble,
   )
-"""
+
   # Communicator
   if isa(distribute,Nothing)
     @assert isa(rank_partition,Nothing)
@@ -169,7 +167,7 @@ function _SteadyState(;
 
   # Reduced quantities
   @assert normalization ∈ [:mhd,:cfd]
-  if normalization === :MHD
+  if normalization === :mhd
     α = 1.0/N
     β = 1.0/Ha^2
     γ = 1.0
@@ -219,7 +217,8 @@ function _SteadyState(;
     :α=>α,
     :β=>β,
     :γ=>γ,
-    :f=>f,
+#    :f=>f,
+    :f=>source,
     :B=>Bfield,
     :ζ=>0.0,
     :convection=>convection,
