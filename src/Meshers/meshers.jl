@@ -23,9 +23,12 @@ module Meshers
   
   export hunt_generate_base_mesh
   
-
   include("solid_mesher.jl")
 
-  export solid_mesh_map, solid_add_tags!, solid_wall_BC
+  export solid_add_tags!, solid_wall_BC
   
+  include("maps.jl")
+  
+  export solid_mesh_map
+
 end
