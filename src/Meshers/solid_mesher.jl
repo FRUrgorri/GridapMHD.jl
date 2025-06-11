@@ -48,19 +48,19 @@ function channel_model(nc::Tuple{Int64,Int64};
     )
     
     domain = (-b, b, -1.0, 1.0, 0.0, 0.1)
-    _nc = (nc...,3)
+    _nc = (nc[1],nc[2],3)
 
     function (parts,rank_partition)
 
-    model = CartesianDiscreteModel(parts, rank_partition, domain, _nc; isperiodic=(false,false,true), map=mesh_map)
-    
-    # Vertex tags: [1:8]
-    # Edge tags: [9:20]
-    # Surf tags: [21:26]
+    model = CartesianDiscreteModel(parts, rank_partition, domain, _nc; isperiodic=(false,false,true),  map=mesh_map)
+   
     labels = get_face_labeling(model)
+#    tags_outlet = append!(collect(5:8), [11, 12, 15, 16], [22])
     tags_insulated = append!(collect(1:20), [23, 24, 25, 26])
+#    add_tag_from_tags!(labels, "outlet", tags_outlet)
     add_tag_from_tags!(labels, "insulated", tags_insulated)
 
+    #Neumann tags are the default, so there is no need to specified "outlet" as Neumann for example
     Dirichlet_Utags=["insulated"]
     Dirichlet_Jtags=["insulated"]
 
