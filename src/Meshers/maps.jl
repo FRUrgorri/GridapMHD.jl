@@ -213,3 +213,30 @@ function stretch_map(coord, xnew, xf::Real, dir::Integer)
 
   return VectorValue(ncoord)
 end
+
+"""
+ map_Moreau()
+
+Mesh map for the benchmarking with the work of Moreau 2010
+"""
+function map_Moreau(;b=5,L=80,Ha=1000,z₀=75,dz=4,Ntot=100,Nsub=25)
+
+  domain_1    = ( 0.0, L)
+  subDomain_1 = (0.0, z₀-dz)		     
+  
+  domain_2 = (z₀-dz,L)
+  subDomain_2 = (z₀-dz,z₀+dz)
+
+  dz_coarse = (L-2*dz)/(Ntot-Nsub)
+  N1 = Int(round((z₀-dz)/dz_coarse))
+
+  function (coord)
+  #Map first in the cross-section
+   ncoord=map_Roberts(b,Ha)(coord)
+  
+  #Accumulate cells in the central region
+   ncoord=ChangeDensity(ncoord; domain=domain_1, subDomain=subDomain_1, cellsTot=Ntot, cellsSub = N1, dirs = (3,))
+   ncoord=ChangeDensity(ncoord; domain=domain_2, subDomain=subDomain_2, cellsTot=(Ntot-N1), cellsSub = Nsub, dirs = (3,))
+   ncoord
+   end
+end
