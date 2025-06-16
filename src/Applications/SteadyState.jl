@@ -1,11 +1,27 @@
 """
   SteadyState(; <keyword arguments>)
 
-Driver capable of running 3D cases and fully developed approximation cases with solid
-coupling in a rectangular geometry.
+Driver that solves an MHD inductionless problem in steady state.
 
 # Arguments
-- To be defined
+- `backend = nothing`: backend for parallelization. Values: nothing, :sequential or :mpi.
+- `np = nothing`: array describing mesh partitioning for parallelization.
+- `title = "Solid"`: job title used for saved files.
+- `path = "."`: path where saved files are stored.
+- `modelGen = nothing, function that generates a Gridap model with the shape (parts, ranks) -> model, tags. See Meshers module for examples 
+- `normalization = :mhd` normalization of the problem variables (pressure) :mhd or :cfd
+- `Ha = 10.0`: Hartmann number.
+- `Re = 1.0`: Reynolds number.
+- `N = nothing`: interaction number.
+- `convection = true`: toggle for the weak form convective term.
+- `B = VectorValue(0.0,1.0,0.0)`: external magnetic field B((x,y,z))/B0.
+- `U_inlet = VectorValue(0.0,0.0,1.0)`: inlet velocity field U((x,y,z))/U0
+- `source = VectorValue(0.0,0.0,0.0)`: momentum source F((x,y,z))/(j0·B0)
+- `solve = true`: toggle to run the solver.
+- `solver = :julia`: solver to be used and additional solver parameters.
+- `verbose = true`: print time statistics.
+- `ku = 2`: order of the U FEM space (H). Pressure elements are of order ku-1 (L)
+- `kj = 1`: order of the J FEM space (RT). Potential elements are of order kj (H)
 """
 function SteadyState(;
   backend = nothing,

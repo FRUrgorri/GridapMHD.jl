@@ -1,12 +1,12 @@
 """
-  channel_model(nc; b, L)
+  channel_model(nc; kargs)
   
   )
   Function that returns an anonym function function that generates a Gridap model and the tags for BC. 
   Arguments are the geometrical characteristics and mesh characteristics of a rectangular cross-sectional channel.
 #Arguments
 
--`nc: tuple of cells in each direction
+-`nc: tuple of cells in each direction. 2D or 3D tuple selects a FD or 3D problem
 -`b: channel aspect ratio
 -`L: channel lenght
 -`mesh_map = mesh map function
@@ -55,12 +55,9 @@ function channel_model(nc::Tuple{Int64,Int64};
     model = CartesianDiscreteModel(parts, rank_partition, domain, _nc; isperiodic=(false,false,true),  map=mesh_map)
    
     labels = get_face_labeling(model)
-#    tags_outlet = append!(collect(5:8), [11, 12, 15, 16], [22])
     tags_insulated = append!(collect(1:20), [23, 24, 25, 26])
-#    add_tag_from_tags!(labels, "outlet", tags_outlet)
     add_tag_from_tags!(labels, "insulated", tags_insulated)
 
-    #Neumann tags are the default, so there is no need to specified "outlet" as Neumann for example
     Dirichlet_Utags=["insulated"]
     Dirichlet_Jtags=["insulated"]
 
