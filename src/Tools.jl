@@ -46,6 +46,47 @@ end
 
 
 """
+  get_coordinates(cp::CellPoint)
+
+Return coordinates of CellPoint `cp` as a matrix.
+"""
+get_coordinates(cp::CellPoint) = _arr_to_matrix(cp.cell_phys_point)
+
+function get_coordinates(cp::GridapDistributed.DistributedCellPoint)
+  coord_arr = []
+  map(local_views(cp)) do lv
+    push!(coord_arr, lv.cell_phys_point)
+  end
+
+  return _arr_to_matrix(vcat(coord_arr...))
+end
+
+
+"""
+  get_values(field, triangulation)
+
+Return valus of `field` evaluated at `triangulation` as a matrix.
+"""
+function get_values(field, triangulation)
+  x = get_cell_points(triangulation)
+  f_trian = evaluate(field, x)
+
+  return _arr_to_matrix(f_trian)
+end
+
+function get_values(field, triangulation::GridapDistributed.DistributedTriangulation)
+  x = get_cell_points(triangulation)
+  f_trian = evaluate(field, x)
+  vals_arr = []
+  map(f_trian) do lv
+    push!(vals_arr, lv)
+  end
+
+  return _arr_to_matrix(vcat(vals_arr...))
+end
+
+
+"""
   get_boundary_value(model, tag, field)
 
 Returns a CellField of `field` restricted to some `tag`ged boundary of `model`.

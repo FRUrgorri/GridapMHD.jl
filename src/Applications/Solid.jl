@@ -42,6 +42,7 @@ coupling in a rectangular geometry.
 - `res_assemble = false`: toggle to time the computation of the residual independently.
 - `jac_assemble = false`: toggle to time the computation of the jacobian independently.
 - `nsums = 10`: number of terms used for the analytical solution computation.
+- `save_outlet = false`: filename where to save outlet velocity to disk.
 
 # Fully developed approximation
 For the fully developed approximation, the following arguments need be set:
@@ -137,6 +138,7 @@ function _Solid(;
   res_assemble = false,
   jac_assemble = false,
   nsums = 10,
+  save_outlet = false,
   #petsc_options="-snes_monitor -ksp_error_if_not_converged true -ksp_converged_reason -ksp_type preonly -pc_type lu -pc_factor_mat_solver_type mumps"
 )
 
@@ -319,7 +321,7 @@ function _Solid(;
   if FD
     cellfields, uh_0, kp = postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
   elseif Full3D
-    cellfields, uh_0, kp = postprocess_3D(xh, model, Ω, b)
+    cellfields, uh_0, kp = postprocess_3D(xh, model, Ω, b, save_outlet)
   end
 
   if cw_s == 0.0 && cw_Ha == 0.0
@@ -511,13 +513,13 @@ function postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
 end
 
 """
-  postprocess_3D(xh, model, Ω, b)
+  postprocess_3D(xh, model, Ω, b, save_outlet)
 
 Post process operations and computations to be run after a 3D solution `xh` is
 obtained, `Ω` is the `model`'s interior, and `b` the half-width in the direction
 perpendicular to the external magnetic field.
 """
-function postprocess_3D(xh, model, Ω, b)
+function postprocess_3D(xh, model, Ω, b, save_outlet)
   uh, ph, jh, φh = xh
   div_jh = ∇·jh
   div_uh = ∇·uh
@@ -541,6 +543,15 @@ function postprocess_3D(xh, model, Ω, b)
     "div_jh"=>div_jh,
     "grad_p"=>Grad_p,
   ]
+
+  if isa(save_outlet, String)
+    Γ = BoundaryTriangulation(model, tags=["outlet", ])
+    x = get_cell_points(Γ)
+    coords = get_coordinates(x)
+    vals = get_values(uh, Γ)
+    tabular = transpose(vcat(coords, vals))
+    write_tabular(tabular, save_outlet)
+  end
 
   return cellfields, uh_0, kp
 end
