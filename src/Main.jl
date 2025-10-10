@@ -259,7 +259,7 @@ function __fe_operator(T,U,V,params)
 end
 
 function _fe_operator(::ConsecutiveMultiFieldStyle,U,V,params)
-  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomila degree
+  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomial degree
   res, jac = weak_form(params,k)
   Tm = params[:solver][:matrix_type]
   Tv = params[:solver][:vector_type]
@@ -269,7 +269,7 @@ end
 
 function _fe_operator(::BlockMultiFieldStyle,U,V,params)
   # TODO: BlockFEOperator, which only updates nonlinear blocks (only important for high Re)
-  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomila degree
+  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomial degree
   res, jac = weak_form(params,k)
   Tm = params[:solver][:matrix_type]
   Tv = params[:solver][:vector_type]
@@ -278,7 +278,7 @@ function _fe_operator(::BlockMultiFieldStyle,U,V,params)
 end
 
 function _ode_fe_operator(::ConsecutiveMultiFieldStyle,U,V,params)
-  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomila degree
+  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomial degree
   res, jac, jac_t = weak_form(params,k)
   Tm = params[:solver][:matrix_type]
   Tv = params[:solver][:vector_type]

@@ -16,8 +16,7 @@ coupling in a rectangular geometry.
 - `Re = 1.0`: Reynolds number.
 - `N = nothing`: interaction parameter.
 - `convection = true`: toggle for the weak form convective term.
-- `B_func = :uniform`: external magnetic field function (or `:uniform`).
-- `dir_B = (0.0,1.0,0.0)`: external magnetic field direction vector for :uniform cases.
+- `Bfield = VectorValue(0.0,1.0,0.0)`: Function of `(x,y,z)` representing `B/B₀`, where `B₀` is the one used to define `Ha`.
 - `curl_free = false`: implement a curl-free correction on the magnetic field.
 - `b = 1.0`: half-width in the direction perpendicular to the external magnetic field.
 - `L = nothing`: length in the axial direction.
@@ -25,7 +24,7 @@ coupling in a rectangular geometry.
 - `tw_s = 0.0`: width of the solid wall normal to the external magnetic field.
 - `cw_Ha = 0.0`: wall parameter in the external magnetic field direction.
 - `cw_s = 0.0`: wall parameter normal to the external magnetic field.
-- `inlet = nothing`: velocity inlet boundary condition function.
+- `u_inlet = VectorValue(0.0,0.0,1.0)`: Function of `(x,y,z)` representing `U/U₀`, where `U₀` is the one used to define Re.
 - `vtk = true`: toggle to save the final results in vtk format.
 - `solve = true`: toggle to run the solver.
 - `solver = :julia`: solver to be used and additional solver parameters.
@@ -34,6 +33,8 @@ coupling in a rectangular geometry.
 - `fluid_stretching = :Roberts`: stretching rule for the fluid mesh.
 - `fluid_stretch_params = (0.5, 1.0)`: parameters for the fluid mesh stretching.
 - `μ = 0.0`: stabilization method coefficient.  Defaults to no stabilization.
+- `ku = 2`: Order of the elements used for the velocity `u`.
+- `kj = 1`: Order of the elements used for the current density `j`.
 - `τ_Ha = 100.0`: penalty term for the thin wall boundary condition in the Ha boundary.
 - `τ_s = 100.0`: penalty term for the thin wall boundary condition in the Side boundary.
 - `res_assemble = false`: toggle to time the computation of the residual independently.
@@ -116,7 +117,7 @@ function _Solid(;
   Re = 1.0,
   N = nothing,
   convection = true,
-  Bfield = VectorValue(0.0,1.0,0.0),  #This is B/B_0 where B_0 is the one used to define Ha, it is in general a function of x,y,z
+  Bfield = VectorValue(0.0,1.0,0.0),
   curl_free = false,
   b = 1.0,
   L = nothing,
@@ -124,7 +125,7 @@ function _Solid(;
   tw_s = 0.0,
   cw_Ha = 0.0,
   cw_s = 0.0,
-  u_inlet = VectorValue(0.0,0.0,1.0), #This is U/U_0 where U_0 is the one used to define Re, it is in general a function of x,y,z
+  u_inlet = VectorValue(0.0,0.0,1.0),
   vtk = true,
   solve = true,
   solver = :julia,
@@ -148,7 +149,7 @@ function _Solid(;
   # 2*ns accounts for ns solid cells on each side of the liquid for each
   # direction
   nc = nl .+ (2 .* ns)
-  
+
   info = Dict{Symbol,Any}()
   params = Dict{Symbol,Any}(
     :solve=>solve,
@@ -196,6 +197,11 @@ function _Solid(;
     if ns[3] > 0
       error("No solid elements allowed at inlet/outlet regions.")
     end
+  else
+    error(
+      "Input args are not compatible with either a 3D computation or a \
+      fully developed approximation."
+    )
   end
 
   # Timer
@@ -331,9 +337,6 @@ function _Solid(;
     if (tw_Ha > 0.0) && (tw_s > 0.0)
       push!(cellfields, "σ"=>σ_Ω)
     end
-#    if B_func != :uniform
-#      push!(cellfields, "B"=>CellField(Bfield, Ω))
-#    end
     writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
     toc!(t,"vtk")
   end

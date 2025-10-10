@@ -48,17 +48,16 @@ function B_arctan(x₀, α, β, γ)
   return _B
 end
 """
- B_Moreau
+  B_Moreau(z₀)
 
-Implicit field defined in R.Moreau et al. (2010) PMC Physics B 3(1):3 
+Implicit field defined in R.Moreau et al. (2010) PMC Physics B 3(1):3
 """
 function B_Moreau(z₀)
-
   f(z) = β -> 3*(1-β[1])/(1+β[1]) - exp(4-2/β[1]-(z-z₀)*π)
 
   _B(z)=nlsolve(f(z),[0.01]).zero[1]
 
- return _B
+  return _B
 end
 
 # Field manipulation functions

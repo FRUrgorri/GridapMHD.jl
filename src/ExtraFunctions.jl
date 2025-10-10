@@ -96,14 +96,14 @@ end
 # Other analytical formulas
 
 """
-  analytical_GeneralHunt_u(l, d_b, grad_pz, Ha, n, x)
+  analytical_GeneralHunt_u(l, d_b, grad_p, Ha, n, x)
 
 General Hunt analytical formula (d_b = 0 for Shercliff).
 
 # Arguments
 - `l::Float64`: channel aspect ratio.
 - `d_b::Float64`: Hartmann walls conductivity ratio.
-- `grad_pz::Float64`: dimensionless (MHD version) presure gradient.
+- `grad_p::Float64`: dimensionless (MHD version) presure gradient.
 - `Ha::Float64`: Hartmann number.
 - `n::Int`: number of sumands included in Fourier series.
 - `x`: evaluation point normalized by the Hartmann characteristic lenght.
@@ -112,7 +112,7 @@ function analytical_GeneralHunt_u(
   # General Hunt analytical formula (d_b = 0 for Shercliff)
   l::Real,          # channel aspect ratio
   d_b::Real,        # Hartmann walls conductivity ratio
-  grad_p::Real,    # Dimensionless (MHD version) presure gradient
+  grad_p::Real,     # Dimensionless (MHD version) presure gradient
   Ha::Real,         # Hartmann number
   n::Int,           # number of sumands included in Fourier series
   x)                # evaluation point normaliced by the Hartmann characteristic lenght
