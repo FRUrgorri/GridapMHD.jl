@@ -16,15 +16,17 @@ coupling in a rectangular geometry.
 - `Re = 1.0`: Reynolds number.
 - `N = nothing`: interaction parameter.
 - `convection = true`: toggle for the weak form convective term.
-- `Bfield = VectorValue(0.0,1.0,0.0)`: Function of `(x,y,z)` representing `B/B₀`, where `B₀` is the one used to define `Ha`.
-- `curl_free = false`: implement a curl-free correction on the magnetic field.
+- `Bfield = (x...) -> VectorValue(0.0,1.0,0.0)`: external magnetic field function `B/B₀`
+  where `B₀` is assumed to be the one used to define `Ha`. It is a function of `x,y,z`.
 - `b = 1.0`: half-width in the direction perpendicular to the external magnetic field.
 - `L = nothing`: length in the axial direction.
 - `tw_Ha = 0.0`: width of the solid wall in the external magnetic field direction.
 - `tw_s = 0.0`: width of the solid wall normal to the external magnetic field.
 - `cw_Ha = 0.0`: wall parameter in the external magnetic field direction.
 - `cw_s = 0.0`: wall parameter normal to the external magnetic field.
-- `u_inlet = VectorValue(0.0,0.0,1.0)`: Function of `(x,y,z)` representing `U/U₀`, where `U₀` is the one used to define Re.
+- `u_inlet = (x...) -> VectorValue(0.0, 0.0, 1.0)`: This is `U/U₀` at the inlet (boundary
+  condition), where `U₀` is the one used to define `Re`.
+  It is in general a function of `x,y,z`.
 - `vtk = true`: toggle to save the final results in vtk format.
 - `solve = true`: toggle to run the solver.
 - `solver = :julia`: solver to be used and additional solver parameters.
@@ -44,20 +46,15 @@ coupling in a rectangular geometry.
 # Fully developed approximation
 For the fully developed approximation, the following arguments need be set:
 - `nc`, and `np` must be 2-dimensional arrays.
-- `L`, `inlet`, and `N` must be set to `nothing`.
+- `L`, and `N` must be set to `nothing`.
 - `Re` must be set to `1.0`.
+- `u_inlet` is ignored.
 
 # 3D simulation
 If a full 3D simulation is to be run, the following arguments need be set:
 - `nc`, and `np` must be 3-dimensional arrays.
 - `L`, and `N` must be numbers.
-- `inlet` must be set to one of the available boundary condition keys (see #Inlet).
 - `Re` must be set to `nothing`.
-
-# Inlet
-Available keys for the inlet velocity boundary condition:
-- `:uniform`: uniform value in the cross section.
-- `:parabolic`: parabolic profile of a fully developed flow.
 
 # Mesh stretching
 There are two available rules for liquid mesh stretching:
@@ -117,15 +114,14 @@ function _Solid(;
   Re = 1.0,
   N = nothing,
   convection = true,
-  Bfield = VectorValue(0.0,1.0,0.0),
-  curl_free = false,
+  Bfield = x -> VectorValue(0.0,1.0,0.0),
   b = 1.0,
   L = nothing,
   tw_Ha = 0.0,
   tw_s = 0.0,
   cw_Ha = 0.0,
   cw_s = 0.0,
-  u_inlet = VectorValue(0.0,0.0,1.0),
+  u_inlet = (x...) -> VectorValue(0.0, 0.0, 1.0),
   vtk = true,
   solve = true,
   solver = :julia,
@@ -157,7 +153,7 @@ function _Solid(;
     :jac_assemble=>jac_assemble,
   )
 
-  #FE order
+  # FE order
   params[:fespaces] = Dict{Symbol, Any}(
   :ku => ku,
   :kj => kj,
@@ -333,10 +329,21 @@ function _Solid(;
   end
   dev_kp = 100*abs(kp_a - kp)/max(kp_a, kp)
 
+  Δp = (-1)*(
+    surf_avg(model, xh[2], "outlet"; restrict=isfluid(b)) -
+    surf_avg(model, xh[2], "inlet"; restrict=isfluid(b))
+  )/L
+  # Avg(B²) assumes axially varying fields
+  avg_Bsq = quad(x->norm(Bfield(VectorValue([0.0, 0.0, x])))^2, 0.0, L; n=500)/L
+  avg_Ha = sqrt(avg_Bsq)*Ha
+  Δp_Miyazaki = kp_tillac(b, avg_Ha, cw_s, cw_Ha)*avg_Bsq
+  dev_Δp = 100*abs(Δp - Δp_Miyazaki)/max(Δp, Δp_Miyazaki)
+
   if vtk
     if (tw_Ha > 0.0) && (tw_s > 0.0)
       push!(cellfields, "σ"=>σ_Ω)
     end
+    push!(cellfields, "B"=>CellField(Bfield, Ω))
     writevtk(Ω, joinpath(path, title), order=2, cellfields=cellfields)
     toc!(t,"vtk")
   end
@@ -368,6 +375,9 @@ function _Solid(;
   info[:dev_kp] = dev_kp
   info[:convection] = convection
   info[:μ] = μ
+  info[:Δp] = Δp
+  info[:Δp_Miyazaki] = Δp_Miyazaki
+  info[:dev_Δp] = dev_Δp
 
   return info, t
 end
@@ -504,7 +514,8 @@ end
   postprocess_3D(xh, model, Ω, b)
 
 Post process operations and computations to be run after a 3D solution `xh` is
-obtained.  `Ω` is the `model`'s interior.
+obtained, `Ω` is the `model`'s interior, and `b` the half-width in the direction
+perpendicular to the external magnetic field.
 """
 function postprocess_3D(xh, model, Ω, b)
   uh, ph, jh, φh = xh
@@ -520,8 +531,6 @@ function postprocess_3D(xh, model, Ω, b)
   Γ = Boundary(model, tags="outlet")
   dΓ = Measure(Γ, 6)
   kp = sum(∫(-Grad_p*_isfluid)*dΓ)[3]/sum(∫(_isfluid)*dΓ)
-  kp_a = nothing
-  dev_kp = nothing
 
   cellfields=[
     "uh"=>uh,
@@ -533,5 +542,5 @@ function postprocess_3D(xh, model, Ω, b)
     "grad_p"=>Grad_p,
   ]
 
-  return cellfields, uh_0, kp, kp_a, dev_kp
+  return cellfields, uh_0, kp
 end

@@ -17,3 +17,4 @@ LocalPreferences.toml
 /docs/site/
 *.so
 .vscode
+*.swp
