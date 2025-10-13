@@ -133,6 +133,51 @@ end
 
 
 """
+  write_tabular_append(tofile, filename)
+
+Write tabular data `tofile` (e.g., a Matrix) to disk under `filename` in append mode,
+without overwriting nor adding headers.
+"""
+function write_tabular_append(tofile, filename)
+  f = open(filename, "a")
+  for row in 1:size(tofile)[1]
+    for col in tofile[row,:]
+        write(f, "$(col) ")
+    end
+    write(f, "\n")
+  end
+
+  return nothing
+end
+
+
+"""
+  safe_write_tabular(tofile, filename, ranks)
+
+Write tabular data `tofile` (e.g., a Matrix) to disk under `filename` where data is
+distributed along `ranks`.  IO operations are serialized to avoid ranks overwriting
+each other.
+"""
+function safe_write_tabular(tofile, filename, ranks)
+  if i_am_main(ranks)
+    f = open(filename, "w")
+    write(f, "x y z v1 v2 v3\n")
+    close(f)
+  end
+  for i in 1:length(ranks)
+    map(ranks) do rank
+      if rank == i
+        write_tabular_append(tofile, filename)
+      end
+    end
+    PartitionedArrays.barrier(ranks)
+  end
+
+  return nothing
+end
+
+
+"""
   read_tabular(filename; delimiter=" ", skip=1)
 
 Read tabular data from `filename` and return it as a `Matrix`.
