@@ -191,17 +191,22 @@ end
 
 
 """
-  read_tabular(filename; delimiter=" ", skip=1)
+  read_tabular(filename; delimiter=" ", skip=1, n=0)
 
 Read tabular data from `filename` and return it as a `Matrix`.
+
+Silently drop lines with a number of elements different than `n` (if `n > 0`).
 """
-function read_tabular(filename; delimiter=" ", skip=1)
+function read_tabular(filename; delimiter=" ", skip=1, n=0)
   @assert isfile(filename)
   arr = []
   i = 1
   for line in eachline(filename)
     if i > skip
-      push!(arr, parse.(Float64, split(line, delimiter; keepempty=false)))
+      newline = parse.(Float64, split(line, delimiter; keepempty=false))
+      if n > 0 && length(newline) == n
+        push!(arr, newline)
+      end
     else
       i += 1
     end
