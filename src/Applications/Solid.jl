@@ -551,7 +551,7 @@ function postprocess_3D(xh, model, Ω, b, save_outlet)
     coords = get_coordinates(x)
     vals = get_values(uh, Γ)
     tabular = transpose(vcat(coords, vals))
-    safe_write_tabular(tabular, save_outlet, get_parts(model))
+    safe_write_tabular(tabular, save_outlet, model)
   end
 
   return cellfields, uh_0, kp

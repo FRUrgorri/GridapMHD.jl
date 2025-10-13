@@ -158,7 +158,10 @@ Write tabular data `tofile` (e.g., a Matrix) to disk under `filename` where data
 distributed along `ranks`.  IO operations are serialized to avoid ranks overwriting
 each other.
 """
-function safe_write_tabular(tofile, filename, ranks)
+function safe_write_tabular(
+  tofile, filename, model::GridapDistributed.DistributedModelOrTriangulation
+)
+  ranks = get_parts(model)
   if i_am_main(ranks)
     f = open(filename, "w")
     write(f, "x y z v1 v2 v3\n")
@@ -172,6 +175,16 @@ function safe_write_tabular(tofile, filename, ranks)
     end
     PartitionedArrays.barrier(ranks)
   end
+
+  return nothing
+end
+
+
+"""
+  safe_write_tabular(tofile, filename, model)
+"""
+function safe_write_tabular(tofile, filename, model)
+  write_tabular(tofile, filename)
 
   return nothing
 end
