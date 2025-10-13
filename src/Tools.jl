@@ -11,16 +11,8 @@ function indices_n_smallest(A::AbstractArray{T,N}, n::Integer) where {T,N}
 end
 
 
-function wavg_interpolator(coords::AbstractMatrix, vals::AbstractMatrix, x; n=8)
-  C = [coords[1:3,i] for i in 1:size(coords)[2]]
-  V = [vals[1:3,i] for i in 1:size(vals)[2]]
-
-  return wavg_interpolator(C, V, x; n=n)
-end
-
-
 """
-  wavg_interpolator(coords, vals, x; n=8)
+  wavg_interpolator(coords, vals, x; n=3)
 
 Find the distance-weighted average of the `n` elements in `vals` closests to `x` according
 to `coords`
@@ -28,9 +20,9 @@ to `coords`
 `vals` is an array of values or vectors where each entry corresponds to the value of a
 discretized function evaluated at the corresponding `coords` entry.  The returned value is
 thediscretized exact value, if it exists, or the distance-weighted average of the `n`
-closest elements. 
+closest elements.
 """
-function wavg_interpolator(coords, vals, x; n=8)
+function wavg_interpolator(coords, vals, x; n=3)
   xarr = get_array(x)
   distances = norm.([ci .- xarr for ci in coords])
   if minimum(distances) == 0.0
@@ -46,12 +38,27 @@ end
 
 
 """
+  wavg_interpolator(coords::AbstractMatrix, vals::AbstractMatrix, x; n=3)
+"""
+function wavg_interpolator(coords::AbstractMatrix, vals::AbstractMatrix, x; n=3)
+  C = [coords[1:3,i] for i in 1:size(coords)[2]]
+  V = [vals[1:3,i] for i in 1:size(vals)[2]]
+
+  return wavg_interpolator(C, V, x; n=n)
+end
+
+
+"""
   get_coordinates(cp::CellPoint)
 
 Return coordinates of CellPoint `cp` as a matrix.
 """
 get_coordinates(cp::CellPoint) = _arr_to_matrix(cp.cell_phys_point)
 
+
+"""
+  get_coordinates(cp::GridapDistributed.DistributedCellPoint)
+"""
 function get_coordinates(cp::GridapDistributed.DistributedCellPoint)
   coord_arr = []
   map(local_views(cp)) do lv
@@ -74,6 +81,10 @@ function get_values(field, triangulation)
   return _arr_to_matrix(f_trian)
 end
 
+
+"""
+  get_values(field, triangulation::GridapDistributed.DistributedTriangulation)
+"""
 function get_values(field, triangulation::GridapDistributed.DistributedTriangulation)
   x = get_cell_points(triangulation)
   f_trian = evaluate(field, x)
@@ -101,40 +112,23 @@ end
 
 
 """
-  write_field(field, trian, file)
-
-Save `field` evaluated at some triangulation `trian` alongside its evaluation coordinates
-in some disk file named `file`.
-"""
-function write_field(field, trian, file)
-  x = get_cell_points(trian)
-  coords = _arr_to_matrix(x.cell_phys_points)
-  vals = _arr_to_matrix(evaluate(field, x))
-  tofile = transpose(vcat(coords, vals))
-  write_tabular(tofile, file)
-
-  return nothing
-end
-
-
-"""
-    write_tabular(tofile, filename)
+  write_tabular(tofile, filename)
 
 Write tabular data `tofile` (e.g., a Matrix) to disk under `filename`.
 """
 function write_tabular(tofile, filename)
-    @assert size(tofile)[2] == 6
-    f = open(filename, "w")
-    write(f, "x y z v1 v2 v3\n")
-    for row in 1:size(tofile)[1]
-        for col in tofile[row,:]
-            write(f, "$(col) ")
-        end
-        write(f, "\n")
+  @assert size(tofile)[2] == 6
+  f = open(filename, "w")
+  write(f, "x y z v1 v2 v3\n")
+  for row in 1:size(tofile)[1]
+    for col in tofile[row,:]
+        write(f, "$(col) ")
     end
-    close(f)
+    write(f, "\n")
+  end
+  close(f)
 
-    return nothing
+  return nothing
 end
 
 
@@ -159,4 +153,13 @@ function read_tabular(filename; delimiter=" ", skip=1)
 end
 
 
-_arr_to_matrix(arr) = stack([[point...] for cell in arr for point in cell])
+function _arr_to_matrix(arr)
+  point_arr = [[point...] for cell in arr for point in cell]
+  if !isempty(point_arr)
+    _arr = stack(point_arr)
+  else
+    _arr = Matrix{Float64}(undef, 3, 0)
+  end
+
+  return _arr
+end
