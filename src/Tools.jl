@@ -98,20 +98,6 @@ end
 
 
 """
-  get_boundary_value(model, tag, field)
-
-Returns a CellField of `field` restricted to some `tag`ged boundary of `model`.
-"""
-function get_boundary_value(model, tags::AbstractArray, field)
-  Γ = BoundaryTriangulation(model, tags=tags)
-  x = get_cell_points(Γ)
-  field_tag = evaluate(field, x)
-
-  return field_tag, Γ
-end
-
-
-"""
   write_tabular(tofile, filename)
 
 Write tabular data `tofile` (e.g., a Matrix) to disk under `filename`.
