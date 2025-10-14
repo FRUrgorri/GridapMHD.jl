@@ -132,6 +132,7 @@ function write_tabular_append(tofile, filename)
     end
     write(f, "\n")
   end
+  close(f)
 
   return nothing
 end
