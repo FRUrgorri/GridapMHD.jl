@@ -319,7 +319,7 @@ function _Solid(;
   # Post process
 
   if FD
-    cellfields, uh_0, kp = postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
+    cellfields, uh_0, kp = postprocess_FD(xh, model, Ω, b, cw_s, cw_Ha, save_outlet)
   elseif Full3D
     cellfields, uh_0, kp = postprocess_3D(xh, model, Ω, b, save_outlet)
   end
@@ -469,12 +469,12 @@ end
 
 # Post-processing and analytical solutions
 """
-  postprocess_FD(xh, Ω)
+  postprocess_FD(xh, model, Ω, b, cw_s, cw_Ha, save_outlet)
 
 Post process operations and computations to be run after a fully developed
-approximation solution `xh` is obtained.  `Ω` is the model's interior.
+approximation solution `xh` is obtained.  `Ω` is the `model`'s interior.
 """
-function postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
+function postprocess_FD(xh, model, Ω, b, cw_s, cw_Ha, save_outlet)
   uh, ph, jh, φh = xh
   div_jh = ∇·jh
   div_uh = ∇·uh
@@ -508,6 +508,10 @@ function postprocess_FD(xh, Ω, b, cw_s, cw_Ha)
     "div_jh"=>div_jh_n,
     "div_uh"=>div_uh_n,
   ])
+
+  if isa(save_outlet, String)
+    todisk(model, uh_n, save_outlet)
+  end
 
   return cellfields, uh_0, kp
 end
