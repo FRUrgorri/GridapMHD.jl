@@ -19,7 +19,7 @@ to `coords`
 
 `vals` is an array of values or vectors where each entry corresponds to the value of a
 discretized function evaluated at the corresponding `coords` entry.  The returned value is
-thediscretized exact value, if it exists, or the distance-weighted average of the `n`
+the discretized exact value, if it exists, or the distance-weighted average of the `n`
 closest elements.
 """
 function wavg_interpolator(coords, vals, x; n=3)
