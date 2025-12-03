@@ -544,14 +544,8 @@ function postprocess_3D(xh, model, Ω, b, save_outlet)
     "grad_p"=>Grad_p,
   ]
 
-  # Save outlet velocity to disk
   if isa(save_outlet, String)
-    Γ = BoundaryTriangulation(model, tags=["outlet", ])
-    x = get_cell_points(Γ)
-    coords = get_coordinates(x)
-    vals = get_values(uh, Γ)
-    tabular = transpose(vcat(coords, vals))
-    safe_write_tabular(tabular, save_outlet, model)
+    todisk(model, uh, save_outlet; tag="outlet")
   end
 
   return cellfields, uh_0, kp

@@ -178,6 +178,25 @@ end
 
 
 """
+  todisk(model, field, filename; tag=nothing)
+
+Save `field` on `model` boundary tagged `tag` to `filename`.
+"""
+function todisk(model, field, filename; tag=nothing)
+  if isnothing(tag)
+    trian = get_triangulation(model)
+  else
+    trian = BoundaryTriangulation(model, tags=[tag, ])
+  end
+  x = get_cell_points(trian)
+  coords = get_coordinates(x)
+  vals = get_values(field, trian)
+  tabular = transpose(vcat(coords, vals))
+  safe_write_tabular(tabular, filename, model)
+end
+
+
+"""
   read_tabular(filename; delimiter=" ", skip=1, n=0)
 
 Read tabular data from `filename` and return it as a `Matrix`.
