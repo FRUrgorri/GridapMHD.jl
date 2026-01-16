@@ -457,7 +457,7 @@ GridapDistributed models.  However, that approach would be preferred.
 """
 function isfluid(b)
   function _isfluid((x, y, z))
-    if (-1 <= x <= 1) && (-b <= y <= b)
+    if (-b <= x <= b) && (-1 <= y <= 1)
       return 1.0
     else
       return 0.0
