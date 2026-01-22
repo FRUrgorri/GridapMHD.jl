@@ -249,8 +249,8 @@ function a_mhd(x,dy,β,γ,B,σ,dΩ)
   ∫(
     β*(∇(u)⊙∇(v_u)) - p*(∇⋅v_u) -(γ*(j×B)⋅v_u) -
     (∇⋅u)*v_p +
-    j⋅v_j - σ*φ*(∇⋅v_j) - σ*(u×B)⋅v_j +
-    - (∇⋅j)*v_φ ) * dΩ
+    j⋅v_j/σ - φ*(∇⋅v_j) - (u×B)⋅v_j +
+    + (∇⋅j)*v_φ ) * dΩ
 end
 
 a_mhd_u_u(u,v_u,β,dΩ)   = ∫( β*(∇(u)⊙∇(v_u)) )*dΩ
@@ -306,7 +306,7 @@ a_al_j_j(j,v_j,ζ,dΩ) = ∫( ζ*(∇⋅j)*(∇⋅v_j) ) * dΩ
 function a_solid(x,dy,σ,dΩ)
   u, p, j, φ = x
   v_u, v_p, v_j, v_φ = dy
-  ∫( j⋅v_j - σ*φ*(∇⋅v_j) + (∇⋅j)*v_φ)dΩ
+  ∫( j⋅v_j/σ - φ*(∇⋅v_j) + (∇⋅j)*v_φ)dΩ
 end
 a_solid_j_j(j,v_j,dΩ)   = ∫( j⋅v_j )*dΩ
 a_solid_j_φ(φ,v_j,σ,dΩ) = ∫( -σ*φ*(∇⋅v_j) )*dΩ
