@@ -109,14 +109,14 @@ function _FullyDeveloped(;
    strech_side = sqrt(sqrt(Ha)/(sqrt(Ha)-1))
 
   function map1(coord)
-     ncoord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
-     ncoord = stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
+     ncoord = GridapMHD.Meshers.stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
+     ncoord = GridapMHD.Meshers.stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_side,strech_Ha),dirs=(1,2))
      ncoord  
    end
 
   function map_fine(coord)
-     ncoord = stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_Ha,strech_Ha),dirs=(1,2))
-     ncoord = stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_Ha,strech_Ha),dirs=(1,2))
+     ncoord = GridapMHD.Meshers.stretchMHD(coord,domain=(0,-b,0,-1.0),factor=(strech_Ha,strech_Ha),dirs=(1,2))
+     ncoord = GridapMHD.Meshers.stretchMHD(ncoord,domain=(0,b,0,1.0),factor=(strech_Ha,strech_Ha),dirs=(1,2))
      ncoord
   end
 
