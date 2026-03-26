@@ -248,7 +248,7 @@ function solid_add_tags!(model, b::Real, tw_Ha::Real, tw_s::Real)
       tol = 1.0e-9
       if all(x->(x[1]>b-tol)||x[1]<-b+tol,xs)
         solid_s
-      elseif all(x->(x[2]>b-tol)||x[2]<-b+tol,xs)
+      elseif all(x->(x[2]>1.0-tol)||x[2]<-1.0+tol,xs)
         solid_Ha
       else
         fluid
