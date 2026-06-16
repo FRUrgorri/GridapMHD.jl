@@ -1,10 +1,10 @@
 module GridapMHD
 
+__precompile__(false)
+
 using Random
 using LinearAlgebra
-using SparseArrays
-using SparseMatricesCSR
-using BlockArrays
+using SparseArrays, SparseMatricesCSR, BlockArrays, FillArrays
 using ForwardDiff
 using NLsolve: nlsolve
 
@@ -15,35 +15,48 @@ using DrWatson
 using Gridap
 using Gridap.Helpers, Gridap.Algebra, Gridap.CellData, Gridap.ReferenceFEs
 using Gridap.Geometry, Gridap.FESpaces, Gridap.MultiField, Gridap.ODEs
+using Gridap.Fields
 
 using PartitionedArrays
 using PartitionedArrays: getany
 
 using GridapDistributed
-using GridapDistributed: i_am_in, i_am_main
+using GridapDistributed: i_am_main
 
 using GridapGmsh
 using GridapPETSc
 
 using GridapSolvers
+using GridapSolvers.SolverInterfaces, GridapSolvers.MultilevelTools, GridapSolvers.PatchBasedSmoothers
 using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers, GridapSolvers.BlockSolvers
+
+using GridapSolvers.PatchBasedSmoothers: CoarsePatchTopology
 
 # Mesh generation
 include("Meshers/meshers.jl")
 
+# MHD problem
+include("gridap_extras.jl")
+include("utils.jl")
+include("geometry.jl")
+include("fespaces.jl")
+include("parameters.jl")
+include("weakforms.jl")
+
 # Solvers
 include("Solvers/gridap.jl")
 include("Solvers/petsc.jl")
+include("Solvers/gmg.jl")
 include("Solvers/li2019.jl")
+include("Solvers/badia2024.jl")
+include("Solvers/h1h1blocks.jl")
 
-# Main driver
-include("Fixes.jl")
-include("ExtraFunctions.jl")
+#Support files
 include("MagneticFields.jl")
-include("parameters.jl")
-include("weakforms.jl")
-include("Main.jl")
 include("PostProcess.jl")
+
+#Main driver
+include("main.jl")
 
 # Applications
 include("Applications/hunt.jl")
@@ -55,7 +68,9 @@ include("Applications/FullyDevelopedFlow.jl")
 include("Applications/Tube.jl")
 include("Applications/Solid.jl")
 include("Applications/SteadyState.jl")
+include("Applications/toy.jl")
 
 export hunt, expansion, cavity, tube, FullyDeveloped, Solid, SteadyState
+
 
 end # module

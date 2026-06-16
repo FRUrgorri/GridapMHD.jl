@@ -1,0 +1,113 @@
+
+# Get polytopes
+
+function Geometry.get_polytopes(model::GridapDistributed.DistributedDiscreteModel)
+  polys = map(get_polytopes,local_views(model))
+  return getany(polys)
+end
+
+function Geometry.get_polytopes(trian::GridapDistributed.DistributedTriangulation)
+  polys = map(get_polytopes,local_views(trian))
+  return getany(polys)
+end
+
+# MacroReferenceFEs
+
+function conformity_from_symbol(sym::Symbol)
+  if sym == :H1
+    return H1Conformity()
+  elseif sym == :L2
+    return L2Conformity()
+  else
+    @assert false
+  end
+end
+
+function Gridap.Adaptivity.MacroReferenceFE(
+  rrule::Gridap.Adaptivity.RefinementRule,
+  reffes::AbstractVector{<:Tuple};
+  macro_kwargs...
+)
+  polys = Gridap.Adaptivity.get_cell_polytopes(rrule)
+  _reffes = map(polys,reffes) do p,r
+    basis, args, kwargs = r
+    ReferenceFE(p,basis,args...;kwargs...)
+  end
+  return Gridap.Adaptivity.MacroReferenceFE(rrule,_reffes;macro_kwargs...)
+end
+
+function Gridap.Adaptivity.MacroReferenceFE(
+  rrule::Gridap.Adaptivity.RefinementRule,
+  reffe::Tuple;
+  macro_kwargs...
+)
+  basis, args, kwargs = reffe
+  reffes = ReferenceFE(rrule.ref_grid,basis,args...;kwargs...)
+  return Gridap.Adaptivity.MacroReferenceFE(rrule,reffes;macro_kwargs...)
+end
+
+function Gridap.Adaptivity.MacroReferenceFE(
+  rrule::Gridap.Adaptivity.RefinementRule,
+  reffe::ReferenceFE;
+  macro_kwargs...
+)
+  reffes = Fill(reffe,Gridap.Adaptivity.num_subcells(rrule))
+  return Gridap.Adaptivity.MacroReferenceFE(rrule,reffes;macro_kwargs...)
+end
+
+########################################################
+
+struct PatchModel{A,B}
+  model::A
+  ptopo::B
+end
+
+function Geometry.Triangulation(model::PatchModel,args...;kwargs...)
+  Geometry.PatchTriangulation(model.model,model.ptopo,args...;kwargs...)
+end
+
+function Geometry.Boundary(model::PatchModel,args...;kwargs...)
+  Geometry.PatchBoundaryTriangulation(model.model,model.ptopo,args...;kwargs...)
+end
+
+function Geometry.Skeleton(model::PatchModel,args...;kwargs...)
+  Geometry.PatchSkeletonTriangulation(model.model,model.ptopo,args...;kwargs...)
+end
+
+function Geometry.Boundary(ptrian::Geometry.PatchTriangulation,args...;kwargs...)
+  Dc = num_cell_dims(ptrian)
+  model = get_background_model(ptrian)
+  tcell_to_mcell = unique(Geometry.get_glue(ptrian,Val(Dc)).tface_to_mface)
+  trian = Triangulation(model,tcell_to_mcell)
+  return Geometry.PatchBoundaryTriangulation(trian,ptrian.ptopo,args...;kwargs...)
+end
+
+function Geometry.Skeleton(ptrian::Geometry.PatchTriangulation,args...;kwargs...)
+  Dc = num_cell_dims(ptrian)
+  model = get_background_model(ptrian)
+  tcell_to_mcell = unique(Geometry.get_glue(ptrian,Val(Dc)).tface_to_mface)
+  trian = Triangulation(model,tcell_to_mcell)
+  return Geometry.PatchSkeletonTriangulation(trian,ptrian.ptopo,args...;kwargs...)
+end
+
+const DistributedPatchTriangulation{Dc,Dp} = GridapDistributed.DistributedTriangulation{Dc,Dp,<:AbstractArray{<:PatchTriangulation}}
+
+function Geometry.Boundary(ptrian::DistributedPatchTriangulation;kwargs...)
+  trians = map(local_views(ptrian)) do ptrian
+    Geometry.Boundary(ptrian;kwargs...)
+  end
+  return GridapDistributed.DistributedTriangulation(trians,ptrian.model)
+end
+
+function Geometry.Skeleton(ptrian::DistributedPatchTriangulation;kwargs...)
+  trians = map(local_views(ptrian)) do ptrian
+    Geometry.Boundary(ptrian;kwargs...)
+  end
+  return GridapDistributed.DistributedTriangulation(trians,ptrian.model)
+end
+
+#########################################################
+
+function PartitionedArrays.default_find_rcv_ids(::MPIArray)
+  PartitionedArrays.find_rcv_ids_ibarrier
+end

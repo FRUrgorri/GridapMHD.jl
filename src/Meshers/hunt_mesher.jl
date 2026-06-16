@@ -25,6 +25,10 @@ end
 
 function hunt_add_tags!(model,L::Real,tw::Real)
   labels = get_face_labeling(model)
+  hunt_add_tags!(labels,model,L,tw)
+end
+
+function hunt_add_tags!(labels,model,L::Real,tw::Real)
   if tw > 0.0 ## add solid tags
     # When model is part of a distributed model we are using
     # that the maximum entity (9) is the same in all parts, 
@@ -53,15 +57,19 @@ function hunt_add_tags!(model,L::Real,tw::Real)
     add_tag!(labels,"solid_2",[solid_2])
     add_tag!(labels,"solid",[solid_1,solid_2])
     add_tag!(labels,"fluid",[fluid])
-    tags_j = vcat(collect(1:(8+12)),collect((1:4).+(8+12+2)))
-    add_tag_from_tags!(labels,"insulating",tags_j)
+    tags_insulating = vcat(collect(2:20),collect((23:26)))
+    tags_conducting = [1]
+    add_tag_from_tags!(labels,"conducting",tags_conducting)
+    add_tag_from_tags!(labels,"insulating",tags_insulating)
     add_non_slip_at_solid_entity!(model,[solid_1,solid_2],fluid,noslip)
     add_tag!(labels,"noslip",[noslip])
   else    
-    tags_u = append!(collect(1:20),[23,24,25,26])
-    tags_j = append!(collect(1:20),[25,26])
-    add_tag_from_tags!(labels,"noslip",tags_u)
-    add_tag_from_tags!(labels,"insulating",tags_j)
+    tags_noslip = append!(collect(1:20),[23,24,25,26])
+    tags_conducting = append!(collect(1:12),collect(17:20),[23,24])
+    tags_insulating = append!([25,26])
+    add_tag_from_tags!(labels,"noslip",tags_noslip)
+    add_tag_from_tags!(labels,"conducting",tags_conducting)
+    add_tag_from_tags!(labels,"insulating",tags_insulating)
   end
 end
 
@@ -99,4 +107,21 @@ function hunt_generate_base_mesh(
   model = CartesianDiscreteModel(domain,_nc;isperiodic=(false,false,true),map=coord_map)
   hunt_add_tags!(model,L,tw)
   return model
+end
+
+function hunt_generate_mesh_hierarchy(
+  parts,np_per_level,nc,L,tw,Ha,kmap_x,kmap_y,BL_adapted
+)
+  Lt = L+tw
+  _nc = (nc[1],nc[2],3)
+  _np_per_level = map(x->(x[1],x[2],1),np_per_level)
+  domain = (-1.0,1.0,-1.0,1.0,0.0,0.1)
+  CartesianModelHierarchy(
+     parts,_np_per_level,domain,_nc;
+    # parts,np_per_level,domain,nc;
+    nrefs = (2,2,1),
+    isperiodic = (false,false,true),
+    map = hunt_stretch_map(Lt,Ha,kmap_x,kmap_y,BL_adapted),
+    add_labels! = labels -> hunt_add_tags!(labels,nothing,L,tw) # TODO: will not work for solid
+  )
 end

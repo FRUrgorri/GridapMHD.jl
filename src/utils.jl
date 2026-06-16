@@ -21,7 +21,7 @@ end
 
 # Function that given a filter set a name to those elements that satisfy the
 # conditions of the filter
-function add_entity!(model,in,name)
+function add_entity!(model,is_in,name)
   labels = get_face_labeling(model)
   node_coordinates = get_node_coordinates(model)
   entity = num_entities(labels) + 1
@@ -29,7 +29,7 @@ function add_entity!(model,in,name)
     facets = get_face_nodes(model,d)
     for (i,facet) in enumerate(facets)
       coord = sum(node_coordinates[facet])/length(facet)
-      if in(coord)
+      if is_in(coord)
         labels.d_to_dface_to_entity[d+1][i] = entity
       end
     end
@@ -41,29 +41,29 @@ end
 
 function kp_shercliff_cartesian(b,Ha)
   kp = 1/(Ha*(1-0.852*Ha^(-0.5)/b-1/Ha))
-kp
+  return kp
 end
 
 function kp_shercliff_cylinder(Ha)
   kp = (3/8)*pi/(Ha-(3/2)*pi)
-kp
+  return kp
 end
 
 function kp_hunt(b,Ha)
   kp = 1/(Ha*(1-0.956*Ha^(-0.5)/b-1/Ha))
-kp
+  return kp
 end
 
 function kp_tillac(b,Ha,cw_s,cw_Ha)
   k_s = (1/(3*b))*(Ha^(0.5)/(1+cw_s*Ha^(0.5)))
   k_Ha = (1+cw_Ha)/(1/Ha + cw_Ha)
   kp = 1/(k_s+k_Ha)
-kp
+  return kp
 end
 
 function kp_glukhih(Ha,cw)
   kp = (3/8)*pi*(1+0.833*cw*Ha-0.019*(cw*Ha)^2)/Ha
-kp
+  return kp
 end
 
 # Other analytical formulas

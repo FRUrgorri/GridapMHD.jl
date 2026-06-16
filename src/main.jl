@@ -102,8 +102,10 @@ or a `GridapDistributed.DistributedDiscreteModel`
   A `Dict` defining the solid domain and solid parameters.
   If not provided or set to `nothing` the solid domain is not taken into account.
   See [`params_solid`](@ref) for further details.
-- `:k => 2`:
-  Maximum interpolation order (i.e., the order used for the fluid velocity).
+- `:order_u => 2`:
+  Order used for the fluid velocity.
+- `:order_j => :order_u`:
+  Order used for the current density.
 - `:solver => default_solver()`:
   Nonlinear solver to compute the solution.
     It should be an instance of some type implementing the `NonlinearSolver` interface of Gridap.
@@ -122,9 +124,12 @@ function main(_params::Dict;output::Dict=Dict{Symbol,Any}())
   params = add_default_params(_params)
   t = params[:ptimer]
 
+  # Geometry
+  setup_geometry!(params)
+
   # FESpaces
   tic!(t;barrier=true)
-  U, V = _fe_spaces(params)
+  U, V = setup_fe_spaces(params)
   toc!(t,"fe_spaces")
 
   tic!(t;barrier=true)
@@ -137,12 +142,12 @@ function main(_params::Dict;output::Dict=Dict{Symbol,Any}())
     toc!(t,"solve")
   else
     op = _fe_operator(U,V,params)
-    xh = _allocate_solution(op,params)
+    xh = initial_guess(op,params)
     if params[:solve]
       solver = _solver(op,params)
       toc!(t,"solver_setup")
       tic!(t;barrier=true)
-      xh,cache = _solve(xh,solver,op,params)
+      xh, cache = _solve(xh,solver,op,params)
       solver_postpro = params[:solver][:solver_postpro]
       solver_postpro(cache,output)
       toc!(t,"solve")
@@ -165,102 +170,53 @@ end
 
 # Solver
 
-_solver(op,params) = _solver(Val(params[:solver][:solver]),Val(params[:transient]),op,params)
-_solver(val::Val,::Val{false},op,params) = _solver(val,op,params)
-
-#_solver(::Val{:julia},op,params) = NLSolver(show_trace=true,method=:newton)
-_solver(::Val{:julia},op,params) = GridapSolvers.NewtonSolver(LUSolver(),maxiter=params[:solver][:niter],rtol=1.e-6,verbose=true)
-_solver(::Val{:petsc},op,params) = PETScNonlinearSolver()
-_solver(::Val{:li2019},op,params) = Li2019Solver(op,params)
-
-function _solver(val::Val,::Val{true},op,params)
-  solver = _solver(val,op,params)
-  _ode_solver(solver,params)
+function _solver(op,params)
+  solver = _solver(Val(params[:solver][:solver]),op,params)
+  if has_transient(params)
+    solver = _ode_solver(solver,params)
+  end
+  return solver
 end
 
-_ode_solver(solver,params) = _ode_solver(Val(params[:ode][:solver]),solver,params)
+function _solver(::Val{:julia},op,params)
+  verbose = i_am_main(get_parts(params[:model]))
+  GridapSolvers.NewtonSolver(
+    LUSolver(),maxiter=params[:solver][:niter],rtol=1.e-6,verbose=verbose
+  )
+end
+_solver(::Val{:petsc},op,params) = PETScNonlinearSolver()
+_solver(::Val{:li2019},op,params) = Li2019Solver(op,params)
+_solver(::Val{:badia2024},op,params) = Badia2024Solver(op,params)
+_solver(::Val{:h1h1blocks},op,params) = H1H1BlockSolver(op,params)
+
+_ode_solver(solver,params) = _ode_solver(Val(params[:transient][:solver][:solver]),solver,params)
 
 function _ode_solver(::Val{:theta},solver,params)
-  Δt = params[:ode][:Δt]
-  θ = params[:ode][:solver_params][:θ]
+  Δt = params[:transient][:Δt]
+  θ = params[:transient][:solver][:θ]
   ThetaMethod(solver,Δt,θ)
 end
 
 function _ode_solver(::Val{:forward},solver,params)
-  Δt = params[:ode][:Δt]
+  Δt = params[:transient][:Δt]
   ForwardEuler(solver,Δt)
-end
-
-# MultiFieldStyle
-
-_multi_field_style(params) = _multi_field_style(Val(params[:solver][:solver]))
-_multi_field_style(::Val{:julia}) = ConsecutiveMultiFieldStyle()
-_multi_field_style(::Val{:petsc}) = ConsecutiveMultiFieldStyle()
-_multi_field_style(::Val{:li2019}) = BlockMultiFieldStyle(4,(1,1,1,1),(3,1,2,4)) # (j,u,p,φ)
-
-# FESpaces
-
-function _fe_spaces(params)
-  ku = params[:fespaces][:ku]
-  kj = params[:fespaces][:kj]
-  T = Float64
-  model = params[:model]
-
-  # ReferenceFEs
-  D = num_cell_dims(model)
-  reffe_u = ReferenceFE(lagrangian,VectorValue{D,T},ku)
-  reffe_p = ReferenceFE(lagrangian,T,ku-1;space=params[:fespaces][:p_space])
-  reffe_j = ReferenceFE(raviart_thomas,T,kj)
-  reffe_φ = ReferenceFE(lagrangian,T,kj)
-
-  # Test spaces
-  mfs = _multi_field_style(params)
-  Ωf  = _fluid_mesh(model,params[:fluid][:domain])
-  V_u = TestFESpace(Ωf,reffe_u;dirichlet_tags=params[:bcs][:u][:tags])
-  V_p = TestFESpace(Ωf,reffe_p;
-    conformity=p_conformity(model,params[:fespaces]),
-    constraint=params[:fespaces][:p_constraint])
-  V_j = TestFESpace(model,reffe_j;dirichlet_tags=params[:bcs][:j][:tags])
-  V_φ = TestFESpace(model,reffe_φ;conformity=:L2)
-  V = MultiFieldFESpace([V_u,V_p,V_j,V_φ];style=mfs)
-
-  # Trial spaces
-  z = zero(VectorValue{D,Float64})
-  u_bc = params[:bcs][:u][:values]
-  j_bc = params[:bcs][:j][:values]
-  if !params[:transient]
-    U_u = u_bc == z ? V_u : TrialFESpace(V_u,u_bc)
-    U_j = j_bc == z ? V_j : TrialFESpace(V_j,j_bc)
-    U_p = TrialFESpace(V_p)
-    U_φ = TrialFESpace(V_φ)
-    U = MultiFieldFESpace([U_u,U_p,U_j,U_φ];style=mfs)
-  else
-    U_u = u_bc == z ? V_u : TransientTrialFESpace(V_u,u_bc)
-    U_j = j_bc == z ? V_j : TransientTrialFESpace(V_j,j_bc)
-    U_p = TransientTrialFESpace(V_p)
-    U_φ = TransientTrialFESpace(V_φ)
-
-    U = TransientMultiFieldFESpace([U_u,U_p,U_j,U_φ];style=mfs)
-  end
-
-  return U, V
 end
 
 # FEOperator
 
-_fe_operator(U,V,params) = __fe_operator(_multi_field_style(params),U,V,params)
-
-function __fe_operator(T,U,V,params)
-  if ! params[:transient]
-    _fe_operator(T,U,V,params)
+function _fe_operator(U,V,params)
+  mfs = _multi_field_style(params)
+  if has_transient(params)
+    _ode_fe_operator(mfs,U,V,params)
+  elseif has_continuation(params)
+    _continuation_fe_operator(mfs,U,V,params)
   else
-   _ode_fe_operator(T,U,V,params)
+    _fe_operator(mfs,U,V,params)
   end
 end
 
 function _fe_operator(::ConsecutiveMultiFieldStyle,U,V,params)
-  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomila degree
-  res, jac = weak_form(params,k)
+  res, jac = weak_form(params)
   Tm = params[:solver][:matrix_type]
   Tv = params[:solver][:vector_type]
   assem = SparseMatrixAssembler(Tm,Tv,U,V)
@@ -269,50 +225,39 @@ end
 
 function _fe_operator(::BlockMultiFieldStyle,U,V,params)
   # TODO: BlockFEOperator, which only updates nonlinear blocks (only important for high Re)
-  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomila degree
-  res, jac = weak_form(params,k)
+  res, jac = weak_form(params)
   Tm = params[:solver][:matrix_type]
   Tv = params[:solver][:vector_type]
   assem = SparseMatrixAssembler(Tm,Tv,U,V)
   return FEOperator(res,jac,U,V,assem)
 end
 
-function _ode_fe_operator(::ConsecutiveMultiFieldStyle,U,V,params)
-  k = max(params[:fespaces][:ku],params[:fespaces][:kj]) #Max polynomila degree
-  res, jac, jac_t = weak_form(params,k)
+function _ode_fe_operator(mfs,U,V,params)
+  res, jac, jac_t = weak_form(params)
   Tm = params[:solver][:matrix_type]
   Tv = params[:solver][:vector_type]
   assem = SparseMatrixAssembler(Tm,Tv,U(0),V(0))
   return TransientFEOperator(res,(jac,jac_t),U,V,assembler=assem)
 end
 
-# Sub-triangulations
+function _continuation_fe_operator(mfs,U,V,params)
+  niter  = params[:continuation][:niter]
+  alphas = params[:continuation][:alphas]
+  nsteps = length(niter)
 
-const DiscreteModelTypes = Union{Gridap.DiscreteModel,GridapDistributed.DistributedDiscreteModel}
-const TriangulationTypes = Union{Gridap.Triangulation,GridapDistributed.DistributedTriangulation}
+  ops = map(alphas) do α
+    p = duplicate_params(params)
+    p[:fluid][:α] = α
+    _fe_operator(mfs,U,V,p)
+  end
 
-function _fluid_mesh(model,domain::DiscreteModelTypes)
-  msg = "params[:fluid][:domain] is a discrete model, but params[:fluid][:domain]===params[:model] is not true."
-  @assert model === domain msg
-  return domain
+  op = _fe_operator(mfs,U,V,params)
+  for step in nsteps:-1:1
+    op = ContinuationFEOperator(ops[step],op,niter[step])
+  end
+
+  return op
 end
-_fluid_mesh(model,domain::TriangulationTypes) = domain
-_fluid_mesh(model,domain::Nothing) = model # This should be removed, but Gridap needs fixes
-_fluid_mesh(model,domain) = Interior(model,tags=domain)
-
-_interior(model,domain::DiscreteModelTypes) = Interior(domain)
-_interior(model,domain::TriangulationTypes) = domain
-_interior(model,domain::Nothing) = Triangulation(model) # This should be removed, but Gridap needs fixes
-_interior(model,domain) = Interior(model,tags=domain)
-
-_boundary(model,domain::TriangulationTypes) = domain
-_boundary(model,domain) = Boundary(model,tags=domain)
-
-# SkeletonTriangulation(model, domain::TriangulationTypes) not defined for distr. models
-_skeleton(model::DiscreteModel,domain::TriangulationTypes) = SkeletonTriangulation(domain)
-_skeleton(model,domain::Nothing) = SkeletonTriangulation(model)
-_skeleton(model::DiscreteModel,domain) = _skeleton(model,_interior(model,domain))
-_skeleton(model, domain) = SkeletonTriangulation(model)
 
 # Random vector generation
 
@@ -327,53 +272,44 @@ end
 
 # Solve
 
-_solve(xh,solver,op,params) = _solve(Val(params[:transient]),xh,solver,op,params)
+_solve(xh,solver,op::FEOperator,params) = solve!(xh,solver,op)
 
-_solve(::Val{false},xh,solver,op,params) = solve!(xh,solver,op)
-
-function _solve(::Val{true},xh,solver,op,params)
-  xh0 = initial_value(op,params)
-  t0,tf = time_interval(params)
+function _solve(xh,solver,op::TransientFEOperator,params)
+  t0, tf = params[:transient][:t0], params[:transient][:tf]
   cache = nothing
-  solve(solver,op,t0,tf,xh0), cache
+  solve(solver,op,t0,tf,xh), cache
 end
 
-initial_value(op,params) = initial_value(Val(params[:ode][:U0]),op,params)
+# Initial guess for the solver
 
-initial_value(::Val{:zero},op,params) = zero(get_trial(op))
-initial_value(::Val{:solve},op,params) = @notimplemented
-
-function initial_value(::Val{:value},op,params)
-  t0 = params[:ode][:t0]
-  U0 = get_trial(op)(t0)
-  v = params[:ode][:initial_values]
-  interpolate([v[:u],v[:p],v[:j],v[:φ]],U0)
-end
-
-time_interval(params) = ( params[:ode][:t0], params[:ode][:tf] )
-
-_allocate_solution(op,params) = _allocate_solution(op,params,params[:solver][:initial_values])
-
-function _allocate_solution(op::FEOperator,params,x0::Dict)
-  x0 = [x0[:u],x0[:p],x0[:j],x0[:φ]]
+function initial_guess(op::FEOperator,params)
   U = get_trial(op)
-  interpolate(x0,U)
+  initial_guess(params[:x0],U,op,params)
 end
 
-function _allocate_solution(op::FEOperator,params,::Nothing)
-  zero(get_trial(op))
+function initial_guess(op::TransientFEOperator,params)
+  t0 = params[:transient][:t0]
+  U0 = get_trial(op)(t0)
+  initial_guess(params[:x0],U0,op,params)
 end
 
-function _allocate_solution(op::TransientFEOperator,args...)
-  nothing
+function initial_guess(x0::Dict,trial,op,params)
+  vals = [x0[:u],x0[:p],x0[:j],x0[:φ]]
+  interpolate(vals,trial)
 end
 
-function _get_cell_size(t::Triangulation)
-  meas = get_cell_measure(t)
-  d = num_dims(t)
-  map(m->m^(1/d),meas)
-end
+initial_guess(x0::Symbol,trial,op,params) = initial_guess(Val(x0),trial,op,params)
+initial_guess(::Val{:zero},trial,op,params) = zero(trial)
 
-function _get_cell_size(t::GridapDistributed.DistributedTriangulation)
-  map(_get_cell_size,local_views(t))
+function initial_guess(::Val{:solve},trial,op,params)
+  @notimplementedif isa(op,TransientFEOperator)
+  @assert has_convection(params) "Convection must be enabled to use initial guess :solve"
+
+  convection = params[:fluid][:convection]
+  params[:fluid][:convection] = :none
+  xh = initial_guess(:zero,trial,op,params)
+  solver = _solver(op,params)
+  xh, cache = _solve(xh,solver,op,params)
+  params[:fluid][:convection] = convection
+  return xh
 end
