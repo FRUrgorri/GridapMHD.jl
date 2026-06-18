@@ -76,7 +76,7 @@ function _SteadyState(;
   Ha = 10.0,
   Re = 1.0,
   N = nothing,
-  convection = true,
+  convection = :newton,
   Bfield = VectorValue(0.0,1.0,0.0),  
   u_inlet = VectorValue(0.0,0.0,1.0), 
   solve = true,
@@ -118,8 +118,8 @@ function _SteadyState(;
   
   #FE order
   params[:fespaces] = Dict{Symbol, Any}(
-  :ku => ku,
-  :kj => kj,
+    :order_u => ku,
+    :order_j => kj,
   )
 
   # Reduced quantities
@@ -156,7 +156,8 @@ function _SteadyState(;
     :γ=>γ,
     :f=>source,
     :B=>Bfield,
-    :ζ=>0.0,
+    :ζᵤ => 0.0,
+    :ζⱼ => 0.0,
     :convection=>convection,
   )
    
